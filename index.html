@@ -3874,14 +3874,16 @@ function svgBar(bar,bi,r,width,opt){
 let rhythm=null, layoutW=360, shown=[];
 const widthFor=r=>Math.max(270,...r.bars.map(b=>layoutBar(b,r).width));
 const barHTML=(b,i,r)=>`<div class="barbox" id="bar${i}"><div class="barnum">${i+1}</div>${svgBar(b,i,r,layoutW)}</div>`;
-function render(r){ r=r||rhythm; layoutW=widthFor(r); shown=r.bars.slice(); $('score').innerHTML=r.bars.map((b,i)=>barHTML(b,i,r)).join(''); HIST.slot=[]; r.bars.forEach((b,i)=>histPush(i,b,r)); }
+function render(r){ r=r||rhythm; layoutW=widthFor(r); shown=r.bars.slice(); $('score').innerHTML=r.bars.map((b,i)=>barHTML(b,i,r)).join(''); $('score').scrollTop=0; HIST.slot=[]; r.bars.forEach((b,i)=>histPush(i,b,r)); }
 function swapBar(i,r){ const el=$('bar'+i); if(!el) return; layoutW=Math.max(layoutW,widthFor(r)); shown[i]=r.bars[i]; el.outerHTML=barHTML(r.bars[i],i,r); histPush(i,r.bars[i],r); const n=$('bar'+i); if(n) n.classList.add('fresh'); }
 function showPreview(r){ clearPreview(); $('score').insertAdjacentHTML('beforeend',`<div class="barbox preview" id="barNext"><div class="barnum">הבא</div>${svgBar(r.bars[0],'x',r,layoutW)}</div>`); }
 function clearPreview(){ const p=$('barNext'); if(p) p.remove(); }
 function setCurBar(b,total,rep){
   if(HIST.slot[b]) HIST.slot[b].p=true;
   document.querySelectorAll('.barbox').forEach(el=>el.classList.toggle('cur',el.id==='bar'+b));
-  const el=$('bar'+b); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
+  const el=$('bar'+b), sc=$('score');
+  // when the score scrolls, keep the playing bar near the top so the next bars are visible below it
+  if(el&&sc.scrollHeight>sc.clientHeight+4){ const top=el.offsetTop-sc.offsetTop-6; if(Math.abs(sc.scrollTop-top)>4) sc.scrollTo({top,behavior:'smooth'}); }
   $('liveMain').textContent=`תיבה ${b+1} / ${total}`;
   $('liveSub').textContent=(S.repeats>0?`חזרה ${rep+1}/${S.repeats} · `:'')+`\u2066${S.bpm} BPM\u2069`;
 }
@@ -5405,6 +5407,9 @@ function fitScore(){
   // px per notation unit: the layout that draws the notes bigger wins
   const fit=c=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*ratio+pad, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,h,px:Math.min(cw/vb.width,(h-pad)/vb.height)}; };
   let f=fit(1); if(n>=3){ const f2=fit(2); if(f2.px>f.px*1.05) f=f2; }
+  // too many bars to read on one screen: keep a readable size and let the score scroll (it follows the playing bar)
+  const MINPX=Math.min(1.15,(W/vb.width)*0.82);
+  if(f.px<MINPX){ const c=W>=700?2:1, cw=(W-gap*(c-1))/c; f={c,h:Math.min(cw*ratio+pad,(MINPX*vb.height)+pad+40),px:MINPX}; }
   sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(40,Math.floor(f.h))}px`;
 }
 new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }catch(e){} }).observe($('score'),{childList:true});
