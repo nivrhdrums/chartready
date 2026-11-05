@@ -800,6 +800,9 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 #qMSub,#qSnd,#qDyn,#qtWhen{font:700 15px var(--f-body);letter-spacing:0}
 #gapBadge{display:none!important} /* the הפסקות tile already shows it */
 
+.pad{height:clamp(70px,14vh,150px)}
+.score{scroll-snap-type:y mandatory}.score .barbox{scroll-snap-align:start}
+
 </style>
 </head>
 <body>
@@ -5410,6 +5413,8 @@ function fitScore(){
   // too many bars to read on one screen: keep a readable size and let the score scroll (it follows the playing bar)
   const MINPX=Math.min(1.15,(W/vb.width)*0.82);
   if(f.px<MINPX){ const c=W>=700?2:1, cw=(W-gap*(c-1))/c; f={c,h:Math.min(cw*ratio+pad,(MINPX*vb.height)+pad+40),px:MINPX}; }
+  // scrolling: size the rows so a whole number of bars fills the space (no bar cut in half at the bottom)
+  if(f.px<MINPX||Math.ceil(n/f.c)*(f.h+gap)-gap>H+2){ const k=Math.max(1,Math.floor((H+gap)/(f.h+gap))); f.h=(H-gap*(k-1))/k; }
   sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(40,Math.floor(f.h))}px`;
 }
 new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }catch(e){} }).observe($('score'),{childList:true});
