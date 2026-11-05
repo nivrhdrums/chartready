@@ -808,6 +808,8 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 .hver{font-family:var(--f-num);font-size:9px;color:#454b53;margin-inline-start:4px}
 
+.audgate{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:60;background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:14px;padding:10px 16px;border-radius:14px;box-shadow:0 8px 30px #000a;cursor:pointer;max-width:92vw;text-align:center}
+
 </style>
 </head>
 <body>
@@ -815,7 +817,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="screen" dir="rtl" id="screen">
   <header class="top">
-    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.14</span></div></div>
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.15</span></div></div>
     <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
     <div class="hicons" dir="ltr">
       <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -895,6 +897,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="pop" id="pop" aria-hidden="true"><div class="popcard" dir="rtl"><div class="pophead"><h3 id="popTitle"></h3><button class="done" id="popClose">סיום</button></div><div id="popBody"></div></div></div>
 <div class="toast" id="toast" hidden></div>
+<div class="audgate" id="audGate" hidden dir="rtl">🔊 לחץ פעם אחת על המסך כדי שהשלט מהטלפון יוכל לנגן</div>
 <div class="kpwrap" id="kpWrap" aria-hidden="true"><div class="kpcard" dir="rtl">
   <div class="pophead"><h3 id="kpTitle">טמפו</h3><button class="done" id="kpCancel">ביטול</button></div>
   <div class="kpshow" id="kpShow">80</div>
@@ -954,7 +957,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
       <div class="field"><div class="label">ספירת סקסטולות</div><div class="chips" id="sextCount"></div></div>
     </section>
     <section class="sec" data-st="about" hidden>
-      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.14</div></div>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.15</div></div>
       <button class="remlock" id="remLock">סודי 🔒</button>
       <div id="remPanel" hidden>
         <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
@@ -5508,11 +5511,12 @@ function rcMsg(d){
   if(RCS.role==='remote'){
     if(d.k==='state'){ RC.applying=true; const tabCh=d.S.tab!==S.tab; Object.assign(S,d.S); if(tabCh) setTab(S.tab); syncUI(); rhythm=deser(d); render(); RC.applying=false; if(RC.live) applyLive(RC.live); }
     if(d.k==='live') applyLive(d);
+    if(d.k==='note') toast(d.txt,{ms:5000});
     return;
   }
   if(RCS.role==='host'){
     if(d.k==='S') applyPhoneS(d.S);
-    if(d.k==='cmd'){ if(d.c==='toggle') toggle(); if(d.c==='new') requestNew(); if(d.c==='clock'){ if(d.a==='go') clk.on?clockStop():clockStart(); if(d.a==='reset'){ clk.acc=0; if(clk.on) clk.from=performance.now(); clockTick(); } } hostSendLive(true); }
+    if(d.k==='cmd'){ if(d.c==='toggle'&&!audOk()){ audGate(true); rsend({k:'note',txt:'צריך ללחוץ פעם אחת על מסך המחשב כדי לאפשר צליל, ואז ללחוץ נגן שוב'}); return; } if(d.c==='toggle') toggle(); if(d.c==='new') requestNew(); if(d.c==='clock'){ if(d.a==='go') clk.on?clockStop():clockStart(); if(d.a==='reset'){ clk.acc=0; if(clk.on) clk.from=performance.now(); clockTick(); } } hostSendLive(true); }
   }
 }
 function applyPhoneS(ns){
@@ -5595,6 +5599,12 @@ async function rcLocalInit(){
 // a QR link opens the app straight into pairing
 (async function(){ if(await rcLocalInit()) return; const p=new URLSearchParams(location.search).get('pair'); if(p&&/^\d{6}$/.test(p)){ rcPending={join:p}; history.replaceState(null,'',location.pathname); rcConnect(); } else if(RCS.role&&RCS.token) rcConnect(); })();
 rcUI();
+
+/* the computer's browser blocks sound until someone clicks the page once; the phone can't do that click */
+function audOk(){ return !!(typeof ctx!=='undefined'&&ctx&&ctx.state==='running'); }
+function audGate(show){ const g=$('audGate'); if(g) g.hidden=!show||audOk(); }
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{ if(RCS.role==='host'&&!audOk()) initAudio().then(()=>audGate(false)).catch(()=>{}); },true));
+setInterval(()=>{ if(RCS.role==='host') audGate(!audOk()); else audGate(false); },1500);
 
 })();
 </script>
