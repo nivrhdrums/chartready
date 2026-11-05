@@ -815,7 +815,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="screen" dir="rtl" id="screen">
   <header class="top">
-    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.10</span></div></div>
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.14</span></div></div>
     <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
     <div class="hicons" dir="ltr">
       <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -954,7 +954,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
       <div class="field"><div class="label">ספירת סקסטולות</div><div class="chips" id="sextCount"></div></div>
     </section>
     <section class="sec" data-st="about" hidden>
-      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.10</div></div>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.14</div></div>
       <button class="remlock" id="remLock">סודי 🔒</button>
       <div id="remPanel" hidden>
         <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
@@ -5429,7 +5429,7 @@ let RCS={unlocked:SECRET_OPEN,role:null,token:null};
 try{ RCS=Object.assign(RCS,JSON.parse(localStorage.getItem('cr_remote')||'{}')); }catch(e){}
 if(SECRET_OPEN) RCS.unlocked=true;
 const rcSave=()=>{ try{ localStorage.setItem('cr_remote',JSON.stringify(RCS)); }catch(e){} };
-let rcWs=null, rcPass=null, rcPending=null, rcRetry=0, rcTimer=null, rcStopped=false;
+let rcWs=null, rcPass=null, rcPending=null, rcRetry=0, rcTimer=null, rcStopped=false, rcLocal=null;
 async function sha(t){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
 const rsend=d=>{ if(rcWs&&rcWs.readyState===1) rcWs.send(JSON.stringify({t:'msg',d})); };
 function rcStatus(txt){ $('remStatus').textContent=txt; }
@@ -5457,6 +5457,7 @@ function rcConnect(){
   try{ ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'); }catch(e){ rcStatus('השליטה מרחוק עובדת רק בגרסה שמותקנת על השרת שלך.'); return; }
   rcWs=ws;
   ws.onopen=()=>{ rcRetry=0;
+    if(rcPending&&rcPending.auto){ ws.send(JSON.stringify({t:'remoteAuto',name:/iPhone/.test(navigator.userAgent)?'iPhone':/Android/.test(navigator.userAgent)?'Android':'טלפון'})); return; }
     if(rcPending&&rcPending.join){ ws.send(JSON.stringify({t:'pairJoin',code:rcPending.join,name:/iPhone/.test(navigator.userAgent)?'iPhone':/Android/.test(navigator.userAgent)?'Android':'טלפון'})); return; }
     if(RCS.role==='host') ws.send(JSON.stringify({t:'host',token:RCS.token,pass:rcPass||''}));
     else if(RCS.role==='remote'&&RCS.token) ws.send(JSON.stringify({t:'remote',token:RCS.token}));
@@ -5467,13 +5468,15 @@ function rcConnect(){
   ws.onerror=()=>{ if(location.hostname.endsWith('claude.ai')||location.protocol==='file:') rcStatus('השליטה מרחוק עובדת רק בגרסה שמותקנת על השרת שלך.'); };
 }
 function rcHandle(m){
-  if(m.t==='hostOk'){ RCS.role='host'; RCS.token=m.token; rcPass=null; rcSave(); RC.connected=true; if((rcPending&&rcPending.pair)||!$('remPairBox').hidden){ rcPending=null; rcWs.send(JSON.stringify({t:'pairStart'})); } rcUI(); return; } // after a server restart the old code is gone: show a fresh one
+  if(m.t==='hostOk'){ RCS.role='host'; RCS.token=m.token; rcPass=null; rcSave(); RC.connected=true; if((rcPending&&rcPending.pair)||(!rcLocal&&!$('remPairBox').hidden)){ rcPending=null; rcWs.send(JSON.stringify({t:'pairStart'})); } rcUI(); return; } // after a server restart the old code is gone: show a fresh one
   if(m.t==='pairCode'){ showPair(m.code); return; }
   if(m.t==='paired'){ RCS.role='remote'; RCS.token=m.token; RCS.unlocked=true; rcPending=null; rcSave(); RC.connected=true; toast('הטלפון חובר למחשב'); rcUI(); return; }
   if(m.t==='peer'){ RC.connected=true; RC.peer=m.online; if(m.phoneName!=null) RC.phoneName=m.phoneName; if(m.paired!=null) RC.paired=m.paired;
     if(RCS.role==='host'){ if(m.online){ $('remPairBox').hidden=true; hostSendState(true); hostSendLive(true); } }
     else rcMode(m.online);
     rcUI(); return; }
+  if(m.t==='revoked'&&rcLocal&&RCS.role==='remote'&&m.why!=='other'){ RCS.role=null; RCS.token=null; rcSave(); rcPending={auto:true}; setTimeout(rcConnect,500); return; }
+  if(m.t==='err'&&m.code==='nohost'){ rcStatus('המחשב עוד לא פתח את האפליקציה. מנסה שוב…'); clearTimeout(rcTimer); rcTimer=setTimeout(()=>{ rcPending={auto:true}; rcConnect(); },3000); return; }
   if(m.t==='revoked'){ if(RCS.role==='remote'){ RCS.role=null; RCS.token=null; toast('השיוך למחשב בוטל'); } else { RC.paired=false; } rcSave(); rcMode(false); RC.peer=false; rcUI(); return; }
   if(m.t==='replaced'){ rcStopped=true; rcStatus('החיבור עבר לחלון אחר של האפליקציה.'); return; }
   if(m.t==='err'){ rcPending=null; const t={password:'הסיסמה לא נכונה',locked:'יותר מדי ניסיונות. נסה שוב בעוד 10 דקות.',badcode:'הקוד לא נכון או שפג תוקפו'}[m.code]||'שגיאה'; toast(t); rcStatus(t); if(m.code==='password'&&RCS.role==='host'&&!RCS.token){ RCS.role=null; rcSave(); } return; }
@@ -5571,8 +5574,26 @@ $('remUnpair').onclick=()=>{ if(rcWs&&rcWs.readyState===1) rcWs.send(JSON.string
 $('remPhoneUnpair').onclick=()=>{ if(rcWs&&rcWs.readyState===1) rcWs.send(JSON.stringify({t:'unpair'})); RCS.role=null; RCS.token=null; rcSave(); rcStopped=true; try{rcWs.close();}catch(e){} rcMode(false); RC.peer=false; rcUI(); };
 $('remEnterCode').onclick=()=>openKeypad({title:'קוד חיבור מהמחשב',value:'',min:0,max:999999,secret:false,maxLen:6,raw:true,onOk:v=>{ rcStopped=false; rcPending={join:String(v).padStart(6,'0')}; rcConnect(); }});
 $('remLockAgain').onclick=()=>{ $('remPanel').hidden=true; };
+// personal version on the home WiFi: the computer is always the host and shows a QR of its own address;
+// a phone that opens that address becomes the remote by itself, no code needed
+async function rcLocalInit(){
+  let j=null; try{ j=await (await fetch('/lan',{cache:'no-store'})).json(); }catch(e){ return false; } if(!j||!j.local) return false; rcLocal=j;
+  const loop=/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  $('remEnterCode').hidden=true; $('remPair').hidden=true;
+  if(loop){
+    RCS.role='host'; rcSave(); rcStopped=false; rcConnect();
+    const url=(j.url||location.origin)+'/';
+    $('remPairBox').hidden=false; $('remCode').hidden=true; $('remUrl').textContent=url;
+    const h=$('remPairBox').querySelector('.hint'); if(h) h.textContent='הטלפון צריך להיות על אותו WiFi. אפשר לשמור את הכתובת למסך הבית.';
+    try{ const q=qrcode(0,'M'); q.addData(url); q.make(); $('remQR').innerHTML=q.createSvgTag({cellSize:5,margin:2,scalable:true}); }catch(e){}
+  } else {
+    if(!(RCS.role==='remote'&&RCS.token)) rcPending={auto:true};
+    rcStopped=false; rcConnect();
+  }
+  rcUI(); return true;
+}
 // a QR link opens the app straight into pairing
-(function(){ const p=new URLSearchParams(location.search).get('pair'); if(p&&/^\d{6}$/.test(p)){ rcPending={join:p}; history.replaceState(null,'',location.pathname); rcConnect(); } else if(RCS.role&&RCS.token) rcConnect(); })();
+(async function(){ if(await rcLocalInit()) return; const p=new URLSearchParams(location.search).get('pair'); if(p&&/^\d{6}$/.test(p)){ rcPending={join:p}; history.replaceState(null,'',location.pathname); rcConnect(); } else if(RCS.role&&RCS.token) rcConnect(); })();
 rcUI();
 
 })();
