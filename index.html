@@ -801,7 +801,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 #gapBadge{display:none!important} /* the הפסקות tile already shows it */
 
 .pad{height:clamp(56px,11vh,130px)}
-.score{scroll-snap-type:y mandatory}.score .barbox{scroll-snap-align:start}
+
 
 /* iPhone home-screen app: 100% stops short of the bottom edge; use the full screen */
 @media (display-mode: standalone){ :root{height:100vh} html,body{height:100%} }
@@ -5413,12 +5413,7 @@ function fitScore(){
   // px per notation unit: the layout that draws the notes bigger wins
   const fit=c=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*ratio+pad, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,h,px:Math.min(cw/vb.width,(h-pad)/vb.height)}; };
   let f=fit(1); if(n>=3){ const f2=fit(2); if(f2.px>f.px*1.05) f=f2; }
-  // too many bars to read on one screen: keep a readable size and let the score scroll (it follows the playing bar)
-  const MINPX=Math.min(1.15,(W/vb.width)*0.6);
-  if(f.px<MINPX){ const c=W>=700?2:1, cw=(W-gap*(c-1))/c; f={c,h:Math.min(cw*ratio+pad,(MINPX*vb.height)+pad+40),px:MINPX}; }
-  // scrolling: size the rows so a whole number of bars fills the space (no bar cut in half at the bottom)
-  if(f.px<MINPX||Math.ceil(n/f.c)*(f.h+gap)-gap>H+2){ const hmin=Math.min(f.h,MINPX*vb.height+pad), k=Math.max(1,Math.floor((H+gap)/(hmin+gap))); f.h=(H-gap*(k-1))/k; }
-  sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(40,f.h).toFixed(2)}px`;
+  sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(18,f.h).toFixed(2)}px`; // never scroll: every bar is on screen
 }
 new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }catch(e){} }).observe($('score'),{childList:true});
 window.addEventListener('resize',fitScore);
