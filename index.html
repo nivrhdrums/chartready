@@ -301,7 +301,7 @@ header{position:relative;display:flex;flex-direction:column;align-items:center;l
 .fround{position:relative;align-self:stretch}
 .fcd{position:absolute;left:2cqw;top:50%;transform:translateY(-50%);width:17cqw;height:17cqw;border-radius:50%;display:grid;place-items:center;font:400 10cqw/1 var(--f-display);color:var(--accent-ink);background:var(--accent);pointer-events:none}
 .fend{position:absolute;inset:0;display:grid;place-items:center;background:rgba(12,14,18,.86);padding:10cqw;text-align:center;font:400 8cqw/1.3 var(--f-display);pointer-events:none}
-.fcam{position:absolute;left:4cqw;bottom:13cqw;width:33cqw;aspect-ratio:3/4;border-radius:18px;overflow:hidden;border:2px solid var(--accent);background:#1c2029;touch-action:none;cursor:grab}
+.fcam{position:absolute;left:3cqw;top:3cqw;width:25cqw;aspect-ratio:1;border-radius:50%;overflow:hidden;border:2px solid var(--accent);background:#1c2029;touch-action:none;cursor:grab}
 .fcam video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;pointer-events:none}
 .fcam.ghost{opacity:0}
 .frec{position:absolute;top:3cqw;right:4cqw;display:flex;gap:1.5cqw;align-items:center;background:#2a1215;color:#ff6b6b;font:700 3.4cqw var(--f-num);padding:1.2cqw 2.6cqw;border-radius:99px;direction:ltr}
@@ -817,7 +817,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="screen" dir="rtl" id="screen">
   <header class="top">
-    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.18</span></div></div>
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.19</span></div></div>
     <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
     <div class="hicons" dir="ltr">
       <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -957,7 +957,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
       <div class="field"><div class="label">ספירת סקסטולות</div><div class="chips" id="sextCount"></div></div>
     </section>
     <section class="sec" data-st="about" hidden>
-      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.18</div></div>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.19</div></div>
       <button class="remlock" id="remLock">סודי 🔒</button>
       <div id="remPanel" hidden>
         <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
@@ -4298,7 +4298,7 @@ $('tapCalBtn').onclick=calOpen; $('calX').onclick=calClose; $('calDone').onclick
 
 /* ---------- filming mode: a clean 9:16 screen, optionally recorded in the app ---------- */
 function fmSync(){
-  $('fmCamRow').hidden=!S.fmRec; $('fmMicRow').hidden=!S.fmRec; $('fmRecHint').hidden=true;
+  $('fmCamRow').hidden=false; $('fmMicRow').hidden=!S.fmRec; // the camera also shows on screen for the phone's own screen recording $('fmRecHint').hidden=true;
   $('fmRoundsF').hidden=S.fmMode==='one'; $('fmStepF').hidden=S.fmMode!=='bpm';
   $('fmRoundsV').textContent=S.fmRounds; $('fmStepV').textContent='+'+(S.fmStep||10);
   $('fmModeHint').textContent=S.fmMode==='lvl'?`מהמורכבות הנוכחית (${S.level}) ועד 10.`:S.fmMode==='bpm'?`מ־⁦${S.bpm} BPM⁩ ועוד ${S.fmStep||10} בכל סבב.`:'מקצב אחד בהגדרות הנוכחיות.';
@@ -4334,7 +4334,7 @@ function filmOpen(){
   $('fGo').textContent=S.fmRec?'⏺ התחל הקלטה':'▶ התחל';
   $('fCam').classList.remove('ghost');
   filmFresh();
-  if(S.fmRec&&(S.fmCam||S.fmMic)) filmMedia();
+  if(S.fmCam||(S.fmRec&&S.fmMic)) filmMedia();
 }
 async function filmMedia(){
   if(FILM.stream) return;
@@ -4342,10 +4342,10 @@ async function filmMedia(){
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw new Error('no media');
     FILM.stream=await navigator.mediaDevices.getUserMedia({
       video:S.fmCam?{facingMode:'user',width:{ideal:720},height:{ideal:960}}:false,
-      audio:S.fmMic?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false});
+      audio:(S.fmRec&&S.fmMic)?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false});
     if(!FILM.on){ FILM.stream.getTracks().forEach(t=>t.stop()); FILM.stream=null; return; }
-    if(FILM.stream.getVideoTracks().length){ $('fVid').srcObject=FILM.stream; $('fCam').hidden=false; try{ await $('fVid').play(); }catch(e){} }
-  }catch(e){ FILM.stream=null; toast('אין גישה למצלמה או למיקרופון. זה עובד כשהאפליקציה רצה מהשרת שלך'); }
+    if(FILM.stream.getVideoTracks().length){ $('fVid').srcObject=FILM.stream; $('fCam').hidden=false; if(S.fmCamPos){ $('fCam').style.left=S.fmCamPos.l; $('fCam').style.top=S.fmCamPos.t; $('fCam').style.bottom='auto'; } try{ await $('fVid').play(); }catch(e){} }
+  }catch(e){ FILM.stream=null; toast('אין גישה למצלמה. באייפון: הגדרות › Safari › מצלמה › אפשר'); }
 }
 async function filmGo(){
   if(FILM.run) return;
@@ -4353,7 +4353,7 @@ async function filmGo(){
   await initAudio(); applyVol();
   $('fCtl').hidden=true; $('fStop').hidden=false; $('fRes').hidden=true; $('fEnd').hidden=true;
   filmFresh();
-  $('fCam').classList.toggle('ghost',!!S.fmClean);
+  $('fCam').classList.toggle('ghost',!!(S.fmClean&&S.fmRec)); // hide the preview only when the app itself records it
   if(S.fmRec&&filmRecStart()) $('fRec').hidden=!!S.fmClean;
   FILM.run=true; FILM.ending=false;
   await start();
@@ -4424,7 +4424,7 @@ $('film').addEventListener('pointerdown',e=>{
   c.addEventListener('pointermove',e=>{ if(!d) return; const f=$('fFrame').getBoundingClientRect(), r=c.getBoundingClientRect();
     const x=clamp(e.clientX-f.left-d.dx,0,f.width-r.width), y=clamp(e.clientY-f.top-d.dy,0,f.height-r.height);
     c.style.left=(100*x/f.width)+'%'; c.style.top=(100*y/f.height)+'%'; c.style.bottom='auto'; });
-  c.addEventListener('pointerup',()=>{ d=null; });
+  c.addEventListener('pointerup',()=>{ if(d){ S.fmCamPos={l:c.style.left,t:c.style.top}; save(); } d=null; });
 })();
 
 /* recording: the frame is painted onto a 1080x1920 canvas every frame, mixed with the app sound and the mic */
@@ -4554,7 +4554,7 @@ function drawSvg(svg){
 }
 function drawCam(el,cs){
   const v=$('fVid'); if(!v.videoWidth) return;
-  const g=FR.g, r=el.getBoundingClientRect(), rad=parseFloat(cs.borderTopLeftRadius)||0, bw=parseFloat(cs.borderTopWidth)||0;
+  const g=FR.g, r=el.getBoundingClientRect(), rad=Math.min(r.width/2,/%$/.test(cs.borderTopLeftRadius)?r.width*parseFloat(cs.borderTopLeftRadius)/100:(parseFloat(cs.borderTopLeftRadius)||0)), bw=parseFloat(cs.borderTopWidth)||0;
   baseT(); g.save(); g.beginPath(); rrP(g,r.left,r.top,r.width,r.height,rad); g.clip();
   const s=Math.max(r.width/v.videoWidth,r.height/v.videoHeight), dw=v.videoWidth*s, dh=v.videoHeight*s;
   g.translate(r.left+r.width/2,r.top+r.height/2); g.scale(-1,1); g.drawImage(v,-dw/2,-dh/2,dw,dh); g.restore();
