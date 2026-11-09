@@ -887,7 +887,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="screen" dir="rtl" id="screen">
   <header class="top">
-    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.22</span></div></div>
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.23</span></div></div>
     <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
     <div class="hicons" dir="ltr">
       <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -1030,7 +1030,8 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
     <section class="sec" data-st="read">
       <div class="field"><div class="srow"><span class="sic">✍</span><div><b>כתיבה מקצועית</b><small>איך נכתבות הפסקות בתוך פעמה</small></div></div>
         <div class="seg3" id="restSeg"><button data-v="0">מקצוען</button><button data-v="50">מעורב</button><button data-v="100">חובבן</button></div></div>
-      <label class="toggle"><input type="checkbox" id="ties"><span><b>חיבורים (קשתות)</b><small>תווים מחוברים בין פעמות</small></span></label>
+      <label class="toggle"><input type="checkbox" id="dots"><span><b>כתיבה מנוקדת</b><small>רבע ושמינית עם נקודה. כבוי: אותם קצבים, עם הפסקות ושש־עשריות</small></span></label>
+      <label class="toggle"><input type="checkbox" id="ties"><span><b>חיבורים (קשתות)</b><small>תווים מחוברים בין פעמות. במסלול הקשתות באות לפי הרמה</small></span></label>
       <div class="field"><div class="srow"><span class="sic">🔁</span><div><b>מקצב חדש אחרי</b></div></div><div class="chips" id="repeats"></div></div>
       <label class="toggle"><input type="checkbox" id="tapOn"><span><b>ניגון יחד</b><small>מתופפים על המסך ומקבלים ניקוד</small></span></label>
       <div class="srow act" id="tapCalBtn" role="button" tabindex="0"><span class="sic">🎯</span><div><b>כיול הקשה</b><small id="tapCalOut">מומלץ פעם אחת לכל טלפון</small></div><span class="go">כייל ‹</span></div>
@@ -1049,7 +1050,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
       <label class="toggle"><input type="checkbox" id="stickOn"><span class="cic" dir="ltr">R L</span><span><b>סטיקינג מתחת לתווים</b><small>סינגלים לפי החלוקה, רבעים תמיד R</small></span></label>
     </section>
     <section class="sec" data-st="about" hidden>
-      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.22</div></div>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.23</div></div>
       <button class="remlock" id="remLock">סודי 🔒</button>
       <div id="remPanel" hidden>
         <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
@@ -1120,7 +1121,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
         <input type="range" id="level" min="1" max="10" step="1" hidden>
         <div class="lvl" id="lvlBox">
           <div class="lvltrack" id="lvlTrack" role="slider" tabindex="0" aria-label="מורכבות" aria-valuemin="1" aria-valuemax="10">
-            <div class="lvlticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="lvlticks" id="lvlTicks"></div>
             <div class="lvlfill" id="lvlFill"><div class="flame"><b></b><b></b><b></b></div></div>
             <div class="lvlthumb" id="lvlThumb"></div>
           </div>
@@ -3524,7 +3525,7 @@ var qrcode = function() {
 (function(){
 const $=id=>document.getElementById(id);
 const SECRET_OPEN=false;
-const DEF={tab:'gen',bpm:80,grids:{1:false,2:true,4:true,3:false,6:false,L:false},level:3,num:4,den:4,bars:4,repeats:1,clickOn:true,noteSound:true,countIn:true,showCount:false,restLvl:0,ties:false,sextCount:'mix',
+const DEF={tab:'gen',bpm:80,grids:{1:false,2:true,4:true,3:false,6:false,L:false},level:3,num:4,den:4,bars:4,repeats:1,clickOn:true,noteSound:true,countIn:true,showCount:false,restLvl:0,ties:false,dots:false,sextCount:'mix',
   mBeats:4,mSub:1,mAcc:[2,1,1,1],gapOn:false,gapPlay:2,gapMute:2,trStart:80,trMax:140,trStep:5,trMode:'bars',trBars:4,trSec:30,
   clockMode:'watch',timerSec:300,songs:[],clickSnd:'pro',trPresets:[],trLoaded:null,songLoaded:null,genPresets:[],genLoaded:null,uiSnd:true,vol:90,mute:false,sinkId:'',
   tapOn:false,tapCal:0,fmClean:false,fmRec:true,fmLay:'half',fmBars:4,fmFacing:'user',hpLag:null,fmCam:true,fmMic:true,fmTitle:'תצליח לקרוא את זה ב־{BPM} BPM?',fmHandle:'@nivdrums',fmEnd:'הגעת עד הסוף? תכתוב לי בתגובות 👇',fmMode:'lvl',fmRounds:5,fmCount:true,fmStep:10,clkClick:true,clkStopClick:true,dynOn:false,stick:false,dynAuto:true,dynLvl:1,mode:'path',trkD:true,trkT:false,manual:['4:1000','4:1010','4:0000','4:0010','4:1111']};
@@ -3599,8 +3600,13 @@ function pick(pool,T){
   for(let i=0;i<pool.length;i++){ r-=w[i]; if(r<=0) return {...pool[i].bt,slots:pool[i].bt.slots.slice()}; }
   const p=pool[pool.length-1]; return {...p.bt,slots:p.bt.slots.slice()};
 }
+const E8={3:{'100':1,'110':1,'111':2,'101':3,'000':3,'011':6,'010':9,'001':9},2:{'10':1,'11':2,'00':3,'01':6},1:{'1':1}};
 function genGroup(k,den,T){
   if(den===4) return pick(qPool(),T);
+  if(modeOf()==='path'){ const L=Math.min(S.level,PATH_MAX), tb=E8[k]||E8[3];
+    if(L>=4&&Math.random()<0.3){ const d=0.35+0.05*Math.min(8,L-4); return {t:'e',k,g:k*2,slots:Array.from({length:k*2},(_,i)=>i===0?Math.random()<0.8:Math.random()<d)}; }
+    const c=Object.keys(tb).filter(x=>tb[x]<=L), nw=c.filter(x=>tb[x]===L); const pickC=nw.length&&Math.random()<0.4?nw:c, x=pickC[Math.floor(Math.random()*pickC.length)];
+    return {t:'e',k,g:k,slots:[...x].map(ch=>ch==='1')}; }
   const d=density();
   const opts=[]; if(S.grids[1]||S.grids[2]||S.grids[3]||S.grids.L) opts.push(k); if(S.grids[4]||S.grids[6]) opts.push(k*2); if(!opts.length) opts.push(k);
   const g=opts[Math.floor(Math.random()*opts.length)];
@@ -3621,11 +3627,24 @@ function pickVar(T,lo,used,fam){
   const fresh=pl.filter(p=>!used.has(beatCode(p.bt))&&p.d<=T+1); if(fresh.length) pl=fresh;
   return pick(pl,beatT(T,lo));
 }
-/* ---------- path mode: a teaching ladder; each level adds patterns, earlier ones stay for review ---------- */
-const LADDER_D={'4:1000':1,'4:1010':1,'4:0000':2,'4:0010':2,'4:1111':3,'4:1011':5,'4:1110':5,'4:0111':5,'4:0011':5,'4:1001':6,'4:1100':6,'4:1101':7,'4:0100':8,'4:0110':8,'4:0001':8,'4:0101':9};
-const LADDER_T={'3:111':1,'3:101':2,'3:110':3,'3:011':3,'Q:101010':4,'3:010':5,'3:001':5};
-const DESC_D=['רבע, 2 שמיניות','הפסקות: רבע, שמינית + שמינית','4 שש־עשריות','רבע עם נקודה בין פעמות','שמינית + 2 שש־עשריות ולהפך, הפסקה + 3 שש־עשריות','שמינית עם נקודה + שש־עשרית ולהפך','שש־עשרית־שמינית־שש־עשרית','סינקופות על ה-e וה-a','הפסקות פנימיות קשות','הכל, כולל שילובים צפופים'];
-const DESC_T=['טריולה מלאה','טריולה עם הפסקה באמצע','1 & · ו־· & a','טריולת רבעים מלאה','תו בודד על ה-& או על ה-a','טריולת רבעים עם הפסקות, טריולת חצאים','סקסטולה מלאה וסקסטולות פשוטות','סקסטולות בינוניות','סקסטולות מעורבות','הכל'];
+/* ---------- path mode: a teaching ladder of 13 levels; each level adds patterns, earlier ones stay for review ----------
+   duple scale: 1 quarters/halves/wholes · 2 eighths · 3 eighth on the & · 4 full 16ths · 5 three on the beat · 6 three with syncopation
+   7 two on the beat · 8 two without the beat · 9 e alone, a alone, 1-a · 10 syncopation mix · 11 ties in the beat · 12 ties over the beat · 13 ties over the barline
+   triplet track runs beside it, sextuplets in five steps (7..11) */
+const PATH_MAX=13;
+const LADDER_D={'4:1000':1,'4:0000':1,'4:1010':2,'4:0010':3,'4:1111':4,'4:1110':5,'4:1011':5,'4:1101':6,'4:0111':6,'4:1100':7,'4:0011':7,'4:0110':8,'4:0101':8,'4:0100':9,'4:0001':9,'4:1001':9};
+const SEXT_ST={'6:111111':7,'6:111100':8,'6:100111':8,'6:111000':8,'6:111110':9,'6:101111':9,'6:111011':9,'6:111010':10,'6:101110':10,'6:101011':10,'6:000111':11,'6:011111':11,'6:001111':11,'6:110111':11,'6:111101':11,'6:110110':11};
+const LADDER_T=Object.assign({'3:111':2,'3:101':4,'3:110':4,'3:011':6,'3:010':9,'3:001':9,'Q:101010':12},SEXT_ST);
+const DESC_D=['רבעים, חצאים ושלמים','שמיניות','שמינית על ה־&','4 שש־עשריות','3 על הפעמה: 16-16-8, 8-16-16','3 עם סינקופה: 16-8-16, הפסקה + 3','2 על הפעמה: 1e, &a','2 בלי הפעמה: e&, e-a','e לבד, a לבד, 1-a','ערבוב סינקופות','קשתות בתוך הפעמה','קשתות מעל הפעמה','קשתות מעל קו התיבה'];
+const DESC_T=['','טריולה מלאה מול שמיניות','מעבר 2↔3 בתוך התיבה','2 מתוך 3 על הפעמה','','פעמה ריקה בטריולה','סקסטולה מלאה','סקסטולות 3+3','1 מתוך 3 · סקסטולות 2+2+2','סקסטולות עם הפסקות','סקסטולות קשות · כתיבה מקוצרת','טריולת רבעים','טריולת חצאים וקשתות'];
+const LMAX=()=>(S.mode||'free')==='path'?PATH_MAX:10;
+// syncopation of one beat (Longuet-Higgins & Lee): a note followed by silence on a stronger spot; a missing downbeat counts too
+const MW={1:[0],2:[0,-1],3:[0,-2,-2],4:[0,-2,-1,-2],6:[0,-3,-2,-1,-2,-3]};
+function synOf(code){
+  const [f,bits]=code.split(':'); if(f==='Q'||f==='H') return 2; const g=+f, b=[...bits].map(x=>x==='1'), w=MW[g]||MW[4];
+  if(!b.some(Boolean)) return 0.5; let s=b[0]?0:1;
+  b.forEach((x,i)=>{ if(!x) return; for(let j=i+1;j<g&&!b[j];j++) s+=Math.max(0,w[j]-w[i]); });
+  return s; }
 // level fixes sent from the rhythm map (code: level, 0 = not in the path)
 const LVL_EDIT={};
 let ALLP=null;
@@ -3637,11 +3656,9 @@ function allPatterns(){
   [2,4].forEach(k=>['10','11','00'].forEach(a=>['10','11','00'].forEach(b=>['10','11','00'].forEach(c=>{ const x=a+b+c; if(x==='000000') return; const bt={t:'L',k,g:6,slots:[...x].map(ch=>ch==='1')}; const code=beatCode(bt); if(!m.has(code)) m.set(code,{bt,code,k}); }))));
   const list=[...m.values()];
   // sextuplets that stay in the app are split into three steps by difficulty
-  const sx=list.filter(p=>p.code[0]==='6'&&!EXCL.has(p.code)).sort((a,b)=>diffOf(a.code)-diffOf(b.code));
-  const sxL={}; sx.forEach((p,i)=>{ sxL[p.code]=p.code==='6:111111'?7:7+Math.min(2,Math.floor(3*i/sx.length)); });
   list.forEach(p=>{
-    const c=p.code; p.trk=c[0]==='4'?'d':'t';
-    p.lvl=LVL_EDIT[c]!=null?LVL_EDIT[c]:LADDER_D[c]||LADDER_T[c]||sxL[c]||((c[0]==='Q'||c[0]==='H')&&!EXCL.has(c)?6:0);
+    const c=p.code; p.trk=c==='4:1000'||c==='4:0000'?'b':c[0]==='4'?'d':'t'; // quarters belong to both tracks
+    p.lvl=LVL_EDIT[c]!=null?LVL_EDIT[c]:LADDER_D[c]||LADDER_T[c]||((c[0]==='Q'||c[0]==='H')&&!EXCL.has(c)?13:0); p.syn=synOf(c);
     p.ok=c==='Q:101010'||!EXCL.has(c)||!!LVL_EDIT[c];
   });
   return ALLP=list;
@@ -3651,16 +3668,24 @@ const modeOf=()=>S.mode||'free';
 function poolNow(){
   const all=allPatterns();
   if(modeOf()==='manual'){ const on=new Set(S.manual||[]); let pl=all.filter(p=>on.has(p.code)); if(!pl.length) pl=all.filter(p=>p.code==='4:1000'); return pl.map(p=>({p,w:1})); }
-  const L=S.level, dOn=S.trkD!==false, tOn=!!S.trkT||!dOn;
-  const pl=all.filter(p=>p.ok&&p.lvl&&p.lvl<=L&&(p.trk==='d'?dOn:tOn));
+  const L=Math.min(S.level,PATH_MAX), dOn=S.trkD!==false, tOn=!!S.trkT||!dOn, cap=synCap();
+  const pl=all.filter(p=>p.ok&&p.lvl&&p.lvl<=L&&(p.trk==='b'||(p.trk==='d'?dOn:tOn)));
   const nw=pl.filter(p=>p.lvl===L).length, od=pl.length-nw;
-  return pl.map(p=>{ let w=nw&&od?(p.lvl===L?0.4/nw:0.6/od):1/pl.length; if(p.code==='4:0000') w*=0.5; if(p.k>1) w*=0.25; return {p,w}; });
+  return pl.map(p=>{ let w=nw&&od?(p.lvl===L?0.4/nw:0.6/od):1/pl.length; if(p.code==='4:0000') w*=0.5; if(p.k>1) w*=0.25;
+    if(p.syn>cap) w*=Math.exp(-(p.syn-cap)*1.3); if(L===10&&p.syn>=1) w*=1.8; return {p,w}; });
 }
+// the syncopation ceiling inside a level: starts at strong full beats, opens up over the first rhythms of the level
+const SYN={lvl:0,n:0};
+function synCap(){ return SYN.lvl!==S.level?0:Math.min(6,0.4+SYN.n*0.6); }
+function synStep(){ if(SYN.lvl!==S.level){ SYN.lvl=S.level; SYN.n=0; } else SYN.n++; }
 function drawW(items){ let s=items.reduce((a,b)=>a+b.w,0), r=Math.random()*s; for(const it of items){ r-=it.w; if(r<=0) return it.p; } return items[items.length-1].p; }
-function genLadderBar(){
-  const pool=poolNow(), q=pool.filter(x=>x.p.k===1), used=new Set(), gr=[]; let i=0;
+function genLadderBar(fam){
+  let pool=poolNow(); if(fam){ const f=pool.filter(x=>x.p.trk==='b'||(x.p.trk==='d')===(fam==='d')); if(f.length) pool=f; }
+  const q=pool.filter(x=>x.p.k===1), used=new Set(), gr=[]; let i=0;
   while(i<S.num){
-    const fit=pool.filter(x=>x.p.k===1||(i%2===0&&i+x.p.k<=S.num));
+    // beat 1 leans to a note on the downbeat while the level is new
+    let fit=pool.filter(x=>x.p.k===1||(i%2===0&&i+x.p.k<=S.num));
+    if(i===0&&synCap()<2) fit=fit.map(x=>({p:x.p,w:x.w*(x.p.bt.slots[0]?1:0.3)}));
     let p=drawW(fit.length?fit:pool);
     if(p.k>1&&(i%2||i+p.k>S.num)) p=null;
     if(p&&p.k===1&&used.has(p.code)){ const fresh=q.filter(x=>!used.has(x.p.code)); if(fresh.length) p=drawW(fresh); }
@@ -3668,7 +3693,11 @@ function genLadderBar(){
     if(!p){ gr.push({t:'q',k:1,g:1,slots:[true]}); i++; continue; }
     used.add(p.code); gr.push(Object.assign({},p.bt,{slots:p.bt.slots.slice()})); i+=p.k;
   }
-  if(modeOf()==='path'&&S.level<4) gr.noExt=true;
+  if(modeOf()==='path'){ gr.lv=Math.min(S.level,PATH_MAX);
+    // both tracks from level 3: a bar holds both feels (2 and 3 side by side)
+    const dOn=S.trkD!==false, tOn=!!S.trkT||!dOn;
+    if(!fam&&dOn&&tOn&&S.level>=3&&gr.length>=2&&gr.every(x=>x.t==='q')){ const fams=new Set(gr.map(famOf));
+      if(fams.size===1){ const need=fams.has('b')?'t':'b', cand=q.filter(x=>famOf(x.p.bt)===need); if(cand.length){ const j=1+Math.floor(Math.random()*(gr.length-1)), p=drawW(cand); gr[j]=Object.assign({},p.bt,{slots:p.bt.slots.slice()}); } } } }
   return gr;
 }
 function genRhythm(){
@@ -3677,9 +3706,11 @@ function genRhythm(){
   const only=![1,2,4,3,6].some(g=>S.grids[g]);
   const hasB=S.grids[2]||S.grids[4], hasT=S.grids[3]||S.grids[6]||S.grids.L;
   let lastCode='';
+  const path=modeOf()==='path', twoT=path&&S.trkD!==false&&!!S.trkT&&S.level===2;
+  if(path) synStep();
   for(let b=0;b<S.bars;b++){
     let gr=[];
-    if(S.den===4&&modeOf()!=='free'){ gr=genLadderBar(); }
+    if(S.den===4&&modeOf()!=='free'){ gr=genLadderBar(twoT?(b%2?'t':'d'):null); }
     else if(S.den===4){
       const used=new Set(); if(lastCode) used.add(lastCode);
       let i=0;
@@ -3701,6 +3732,11 @@ function genRhythm(){
     } else gr=groups.map(k=>genGroup(k,S.den,T));
     if(!gr.some(x=>x.slots.some(Boolean))){ const x=gr[Math.floor(Math.random()*gr.length)]; x.slots[0]=true; }
     gr.seed=1+Math.floor(Math.random()*2e9);
+    if(path&&!gr.lv) gr.lv=Math.min(S.level,PATH_MAX);
+    // level 13: now and then the last note of a bar is tied into the next bar
+    const pv=bars[b-1];
+    if(path&&S.den===4&&S.level>=13&&pv&&Math.random()<0.4){ const lb=pv[pv.length-1], fb=gr[0];
+      if(lb&&lb.t==='q'&&lb.slots[lb.g-1]&&fb&&fb.t==='q'&&[1,2,4,3].includes(fb.g)&&gr.some((x,j)=>j>0&&x.slots.some(Boolean))){ fb.slots=fb.slots.slice(); fb.slots[0]=false; gr.ti=true; pv.to=true; } }
     if(S.dynOn) gr.acc=pickAccents(gr,S.den,dynStage());
     bars.push(gr);
   }
@@ -3761,7 +3797,10 @@ const isInt=x=>Math.abs(x-Math.round(x))<1e-9;
 // Turns generated hits into written notes. opt: {p: rest level 0..1, feel:'d'|'t', longBroken, ties}
 function notate(bar,r,seed,opt){
   opt=opt||{};
-  const p=opt.p!=null?opt.p:S.restLvl/100, ties=opt.ties!=null?opt.ties:S.ties, up=r.den===4?12:6, R=rng(seed||1);
+  // a path bar carries its level (bar.lv): ties over the beat from 12, ties inside the beat from 11, triplet shorthand from 11
+  const lv=bar.lv||0, dots=opt.dots!=null?opt.dots:!!S.dots;
+  const p=opt.p!=null?opt.p:S.restLvl/100, ties=opt.ties!=null?opt.ties:(lv?lv>=12:S.ties), tieIn=!dots&&(lv?lv>=11:ties), up=r.den===4?12:6, R=rng(seed||1);
+  const brN={};
   const ch=x=>x>=1?true:x<=0?false:R()<x;
   const groups=[], toks=[]; let brId=0, tk=0;
   const mk=(g,kind,tick,dur,tup,br)=>{const t={kind,tick,dur,grp:g,tup:!!tup,br}; toks.push(t); return t;};
@@ -3771,8 +3810,9 @@ function notate(bar,r,seed,opt){
       let j=i+1; while(j<end&&!on[j]) j++;
       if(on[i]){
         const nv=mode==='rests'?1:vals.find(v=>v<=j-i);
-        mk(g,'note',g.start+i*u,nv*u,tup,br); let q=i+nv;
-        greedy(j-i-nv,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;});
+        const N=mk(g,'note',g.start+i*u,nv*u,tup,br); let q=i+nv;
+        if(tieIn&&mode!=='rests'&&!tup&&j-i>nv&&j-i===nv*1.5){ const T=mk(g,'note',g.start+q*u,(j-i-nv)*u,tup,br); T.tied=true; N.tieTo=T; q=j; }
+        greedy(j-i-nv,vals).forEach(v=>{ if(q>=j) return; mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;});
       } else { let q=i; greedy(j-i,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;}); }
       i=j;
     }
@@ -3780,24 +3820,27 @@ function notate(bar,r,seed,opt){
   function sext(g,on,u,mode){
     const s=on.map(x=>x?'1':'0').join(''), okH=h=>h==='100'||h==='111'||h==='000';
     const dOk=okH(s.slice(0,3))&&okH(s.slice(3)), tOk=s.indexOf('1')%2===0;
-    g.simple=dOk;
     let feel;
-    if(s==='000001'){ feel='d'; mode='extend'; }
+    if(s==='111111') feel=opt.feel||(S.sextCount==='eighth'?'d':S.sextCount==='num'?'t':(ch(.5)?'d':'t'));
+    else if(SX_FEEL[s]) feel=SX_FEEL[s];
+    else if(s==='000001'){ feel='d'; mode='extend'; }
     else if(opt.feel&&(opt.feel==='d'?dOk:tOk)) feel=opt.feel;
     else if(dOk&&tOk) feel=ch(.5)?'d':'t';
     else if(dOk) feel='d'; else if(tOk) feel='t';
     else feel=mode==='extend'?'d':(ch(.5)?'d':'t3');
+    g.simple=feel==='d';
     if(feel==='d'){
+      // 3+3: two brackets of 3; an empty half is an eighth rest, a half with only its first note is a plain eighth (no dot)
       [0,3].forEach(o=>{
         const hp=s.slice(o,o+3);
         if(hp==='000'){ mk(g,'rest',g.start+o*u,3*u,0,null); return; }
-        if(hp==='100'&&mode==='extend'){ mk(g,'note',g.start+o*u,3*u,0,null); return; }
+        if(hp==='100'){ mk(g,'note',g.start+o*u,3*u,0,null); return; }
         tokenize(g,on,o,3,u,[2,1],mode,1,brId++);
       });
     } else {
-      const br=brId++;
-      if(feel==='t'&&mode==='extend') tokenize(g,on,0,6,u,[4,3,2,1],'extend',1,br);
-      else [0,2,4].forEach(o=>tokenize(g,on,o,2,u,[2,1],'extend',1,br));
+      // 2+2+2: one bracket of 6 over pairs
+      const br=brId++; brN[br]=6;
+      [0,2,4].forEach(o=>tokenize(g,on,o,2,u,[2,1],'extend',1,br));
     }
   }
   function processQ(bt,start,len){
@@ -3807,9 +3850,9 @@ function notate(bar,r,seed,opt){
     if(!raw){ if(!hits.length) G=bt.t==='q'?1:bt.k; else G=(bt.t==='q'?[1,2,3,4,6]:[bt.k,2*bt.k]).find(c=>hits.every(o=>isInt(o*c/len))); }
     const g={t:bt.t,k:bt.k,start,len,G,tup:bt.t==='q'&&(G===3||G===6)?G:0}; groups.push(g);
     const u=len/G, on=new Array(G).fill(false); hits.forEach(o=>on[Math.round(o/u)]=true);
-    const mode=restMode?'rests':'extend';
+    const mode=restMode||(lv&&lv<11&&g.tup===3)?'rests':'extend';
     if(g.tup===6){ sext(g,on,u,mode); return; }
-    const vals=g.t==='q'?{1:[1],2:[2,1],4:[4,3,2,1],3:[2,1]}[G]:(G===g.k?[3,2,1]:[6,4,3,2,1]).filter(v=>v<=G);
+    const vals=g.t==='q'?{1:[1],2:[2,1],4:dots?[4,3,2,1]:[4,2,1],3:[2,1]}[G]:(G===g.k?[3,2,1]:[6,4,3,2,1]).filter(v=>v<=G);
     tokenize(g,on,0,G,u,vals,mode,g.tup,g.tup?brId++:null);
   }
   bar.forEach(bt=>{
@@ -3832,6 +3875,8 @@ function notate(bar,r,seed,opt){
     });
   });
   const total=tk, plain=g=>!g.tup&&!g.long;
+  if(bar.ti){ const f=toks.find(t=>t.tick===0); if(f&&f.kind==='rest'){ f.kind='note'; f.tied=true; f.tieIn=true; } }
+  if(bar.to){ let l=null; toks.forEach(t=>{ if(t.kind==='note'&&(!l||t.tick>l.tick)) l=t; }); if(l) l.tieOut=true; }
   if(r.den===4){
     for(let x=0;x<toks.length;x++){
       const N=toks[x];
@@ -3841,7 +3886,7 @@ function notate(bar,r,seed,opt){
       let stop=y<toks.length?toks[y].tick:total;
       for(let z=x+1;z<=y&&z<toks.length;z++) if(!plain(toks[z].grp)){ stop=Math.min(stop,toks[z].grp.start); break; }
       const avail=stop-N.tick;
-      const c=[48,36,24,18,12].find(d=>d>N.dur&&d<=avail&&(d===48?N.tick===0:d>=24?N.tick%12===0:N.tick%6===0));
+      const c=(dots?[48,36,24,18,12]:[48,24,12]).find(d=>d>N.dur&&d<=avail&&(d===48?N.tick===0:d>=24?N.tick%12===0:N.tick%6===0));
       const nx=toks[x+1], canTie=ties&&nx.kind==='rest'&&plain(nx.grp)&&nx.tick===N.tick+N.dur;
       const opts=[]; if(c&&!bar.noExt) opts.push('ext'); if(canTie) opts.push('tie');
       if(!opts.length||ch(p)) continue;
@@ -3853,7 +3898,7 @@ function notate(bar,r,seed,opt){
         const t=toks[z], te=t.tick+t.dur;
         if(te<=E) continue;
         if(t.tick>=E){ keep.push(t); continue; }
-        let q=E; greedy(te-E,[12,9,6,3]).forEach(v=>{keep.push({kind:'rest',tick:q,dur:v,grp:t.grp,tup:false,br:null});q+=v;});
+        let q=E; greedy(te-E,dots?[12,9,6,3]:[12,6,3]).forEach(v=>{keep.push({kind:'rest',tick:q,dur:v,grp:t.grp,tup:false,br:null});q+=v;});
       }
       toks.splice(x+1,y-x-1,...keep);
     }
@@ -3862,9 +3907,9 @@ function notate(bar,r,seed,opt){
       if(a.kind==='rest'&&b.kind==='rest'&&!a.tup&&!b.tup&&a.dur===12&&b.dur===12&&a.tick%24===0&&b.tick===a.tick+12&&plain(a.grp)&&plain(b.grp)&&!ch(p)){ a.dur=24; toks.splice(x+1,1); }
     }
   }
-  return {groups,toks,total,den:r.den,num:r.num};
+  return {groups,toks,total,den:r.den,num:r.num,brN};
 }
-function groupW(g,used){ if(g.long) return g.k===2?150:240; if(!used) return 34; if(g.t==='e') return (g.G===g.k?24:15)*g.G+12; return {1:40,2:52,3:80,4:76,6:110}[g.G]; }
+function groupW(g,used){ if(g.long) return g.k===2?150:240; if(!used) return 34; if(g.t==='e') return (g.G===g.k?24:15)*g.G+12; return {1:40,2:52,3:80,4:76,6:128}[g.G]; }
 function layoutBar(bar,r,opt){
   const nt=notate(bar,r,bar.seed,opt), used=new Set(nt.toks.map(t=>t.grp));
   // a flagged note right before a longer note in a tuplet (8th then quarter) gets extra room for its flag
@@ -3912,7 +3957,7 @@ function svgBar(bar,bi,r,width,opt){
   const beamed=new Set(); runs.forEach(rn=>{ if(rn.length>1) rn.forEach(t=>beamed.add(t)); });
   nt.toks.forEach(t=>{
     const x=tx(t), v=nd(t);
-    if(t.kind==='rest'){ const [g,dot]=RV[v]||RV[12]; s+=mg(GL[g],x-2,L); if(dot) s+=mg(GL.dot,x+12,L-5); return; }
+    if(t.kind==='rest'){ const [g,dot]=RV[v]||RV[12]; s+=mg(GL[g],t.tup&&v<=3?x+1.5:x-2,L); if(dot) s+=mg(GL.dot,x+12,L-5); return; }
     const info=NV[v]||NV[12];
     // hollow heads: a thin outline with no staff line showing through
     const hx=x+(info.h==='whole'?7.2:5.9), hole=info.h==='whole'?`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="3" ry="4" transform="rotate(-30 ${hx.toFixed(1)} ${L})"/>`:`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="4.8" ry="3" transform="rotate(-25 ${hx.toFixed(1)} ${L})"/>`;
@@ -3923,8 +3968,8 @@ function svgBar(bar,bi,r,width,opt){
     // a flagged note's dot goes past the flag so it doesn't sit inside the curl
     if(info.d) s+=mg(GL.dot,x+HW+(info.b&&!beamed.has(t)?13:4),L-5);
   });
-  nt.toks.forEach(t=>{ if(!t.tieTo) return; const x1=tx(t)+7, x2=tx(t.tieTo)+5, m=(x1+x2)/2;
-    s+=`<path class="tie" d="M${x1} ${L+7} Q${m} ${L+17} ${x2} ${L+7} Q${m} ${L+13} ${x1} ${L+7}Z"/>`; });
+  const tieP=(x1,x2)=>{ const m=(x1+x2)/2; return `<path class="tie" d="M${x1} ${L+7} Q${m} ${L+17} ${x2} ${L+7} Q${m} ${L+13} ${x1} ${L+7}Z"/>`; };
+  nt.toks.forEach(t=>{ if(t.tieTo) s+=tieP(tx(t)+7,tx(t.tieTo)+5); if(t.tieIn) s+=tieP(1,tx(t)+5); if(t.tieOut) s+=tieP(tx(t)+7,width-3); });
   runs.forEach(rn=>{
     if(rn.length<2) return;
     const a=sx(rn[0]), b=sx(rn[rn.length-1]);
@@ -3941,7 +3986,7 @@ function svgBar(bar,bi,r,width,opt){
   Object.values(brs).forEach(ts=>{
     const last=ts[ts.length-1], endT=Math.max(...ts.map(t=>t.tick+t.dur)), flagged=last.kind==='note'&&!beamed.has(last)&&(NV[nd(last)]||NV[12]).b;
     const a=tx(ts[0])+(ts[0].kind==='note'?4:0), b=Math.max(tx(last)+HW+(flagged?14:6), X(tickX(last.grp,endT))-6), m=(a+b)/2, accIn=(bar.acc||[]).some(k=>ts.some(t=>t.kind==='note'&&Math.round(t.tick)===k)), y=accIn?STEMTOP-19:STEMTOP-6;
-    s+=`<path class="tripline" d="M${a} ${y+6} v-6 H${m-7} M${m+7} ${y} H${b} v6"/><text class="trip" x="${m}" y="${y+4}">3</text>`;
+    s+=`<path class="tripline" d="M${a} ${y+6} v-6 H${m-7} M${m+7} ${y} H${b} v6"/><text class="trip" x="${m}" y="${y+4}">${nt.brN[ts[0].br]||3}</text>`;
   });
   if(S.showCount){
     // every count position of each beat, at the finest subdivision that beat uses
@@ -3996,6 +4041,8 @@ function beatCode(bt){
   return '';
 }
 const EXCL=new Set(["6:000011", "6:000101", "6:000110", "6:001001", "6:001011", "6:001100", "6:001101", "6:001110", "6:010000", "6:010001", "6:010010", "6:010011", "6:010100", "6:010101", "6:010110", "6:010111", "6:011000", "6:011001", "6:011010", "6:011011", "6:011100", "6:011101", "6:011110", "6:100001", "6:100011", "6:100101", "6:100110", "6:101001", "6:101100", "6:101101", "6:110000", "6:110001", "6:110010", "6:110011", "6:110100", "6:110101", "6:111000", "6:111001", "H:000010", "H:000011", "H:001000", "H:001010", "H:001011", "H:001100", "H:001110", "H:001111", "H:100000", "H:100010", "H:100011", "H:101000", "H:101011", "H:101100", "H:101110", "H:101111", "H:110000", "H:110010", "H:110011", "H:111000", "H:111010", "H:111011", "H:111100", "H:111110", "H:111111", "Q:000011", "Q:001011", "Q:001100", "Q:001110", "Q:001111", "Q:100011", "Q:101011", "Q:101100", "Q:101110", "Q:101111", "Q:110000", "Q:110010", "Q:110011", "Q:111000", "Q:111010", "Q:111011", "Q:111100", "Q:111110", "Q:111111"]);
+EXCL.delete('6:111000'); EXCL.add('6:000001');
+const SX_FEEL={'111100':'d','100111':'d','111000':'d','000111':'d','111110':'t','101111':'t','111011':'t','111010':'t','101110':'t','101011':'t','011111':'t','001111':'t','110111':'t','111101':'t','110110':'t'};
 const ALLOW={};
 function allowed(key,make){ if(!ALLOW[key]) ALLOW[key]=make().filter(bt=>!EXCL.has(beatCode(bt))); return ALLOW[key]; }
 
@@ -4414,7 +4461,7 @@ function fmSync(){
   $('fmCamRow').hidden=false; $('fmMicRow').hidden=!S.fmRec; // the camera also shows on screen for the phone's own screen recording $('fmRecHint').hidden=true;
   $('fmRoundsF').hidden=S.fmMode==='one'; $('fmStepF').hidden=S.fmMode!=='bpm';
   $('fmRoundsV').textContent=S.fmRounds; $('fmStepV').textContent='+'+(S.fmStep||10);
-  $('fmModeHint').textContent=S.fmMode==='lvl'?`מהמורכבות הנוכחית (${S.level}) ועד 10.`:S.fmMode==='bpm'?`מ־⁦${S.bpm} BPM⁩ ועוד ${S.fmStep||10} בכל סבב.`:'מקצב אחד בהגדרות הנוכחיות.';
+  $('fmModeHint').textContent=S.fmMode==='lvl'?`מהמורכבות הנוכחית (${S.level}) ועד ${LMAX()}.`:S.fmMode==='bpm'?`מ־⁦${S.bpm} BPM⁩ ועוד ${S.fmStep||10} בכל סבב.`:'מקצב אחד בהגדרות הנוכחיות.';
 }
 ['fmClean','fmRec','fmCam','fmMic','fmCount','tapOn'].forEach(k=>{ const el=$(k); el.checked=!!S[k]; el.onchange=()=>{ S[k]=el.checked; save(); fmSync(); tapUI(); }; });
 ['fmTitle','fmHandle','fmEnd'].forEach(k=>{ const el=$(k); el.value=S[k]||''; el.oninput=()=>{ S[k]=el.value; save(); }; });
@@ -4425,7 +4472,7 @@ fmSync();
 function filmApply(i){
   const o=FILM.orig, n=FILM.rounds=S.fmMode==='one'?1:S.fmRounds;
   S.level=o.level; S.bpm=o.bpm;
-  if(S.fmMode==='lvl'&&n>1) S.level=Math.round(o.level+(10-o.level)*i/(n-1));
+  if(S.fmMode==='lvl'&&n>1) S.level=Math.round(o.level+(LMAX()-o.level)*i/(n-1));
   if(S.fmMode==='bpm') S.bpm=clamp(o.bpm+i*(S.fmStep||10),1,400);
 }
 function filmMeta(){
@@ -4704,8 +4751,8 @@ var HIST={runs:[],pend:[],slot:[],cur:null,sel:new Set(),open:null};
 try{ const h=JSON.parse(localStorage.getItem('cr_hist')||'null'); if(h&&Array.isArray(h.runs)) HIST.runs=h.runs; }catch(e){}
 function histSave(){ try{ localStorage.setItem('cr_hist',JSON.stringify({runs:HIST.runs})); }catch(e){} }
 const histOff=()=>!!((FILM&&FILM.on)||RC.remoteMode||RC.applying);
-const histEntry=(bar,r)=>({b:bar.map(x=>({t:x.t,k:x.k,g:x.g,slots:x.slots.slice()})),s:bar.seed||1,n:r.num,d:r.den,ne:!!bar.noExt,a:bar.acc||null,p:false});
-const histBar=e=>{ const b=e.b.map(x=>Object.assign({},x,{slots:x.slots.slice()})); b.seed=e.s; if(e.ne) b.noExt=true; if(e.a) b.acc=e.a.slice(); return b; };
+const histEntry=(bar,r)=>({b:bar.map(x=>({t:x.t,k:x.k,g:x.g,slots:x.slots.slice()})),s:bar.seed||1,n:r.num,d:r.den,ne:!!bar.noExt,a:bar.acc||null,lv:bar.lv||0,ti:!!bar.ti,to:!!bar.to,p:false});
+const histBar=e=>{ const b=e.b.map(x=>Object.assign({},x,{slots:x.slots.slice()})); b.seed=e.s; if(e.ne) b.noExt=true; if(e.a) b.acc=e.a.slice(); if(e.lv) b.lv=e.lv; if(e.ti) b.ti=true; if(e.to) b.to=true; return b; };
 function histPush(i,bar,r){
   if(histOff()) return;
   const e=histEntry(bar,r); HIST.slot[i]=e;
@@ -4789,7 +4836,7 @@ function fsCamStop(){ if(FS_STREAM){ FS_STREAM.getTracks().forEach(t=>t.stop());
 function fsTiles(){
   const one=S.fmMode==='one';
   const T=(k,lbl,ic,val,cls,dis)=>`<button class="fs-tile ${cls||''}" data-fs="${k}" ${dis?'disabled':''}><small>${lbl}</small><span class="ic">${ic}</span><b class="${/^[\d+→\s−-]+$/.test(String(val))?'n':''}">${val}</b></button>`;
-  const step=S.fmMode==='bpm'?'+'+(S.fmStep||10)+' BPM':S.fmMode==='lvl'?`${S.level}→10`:'—';
+  const step=S.fmMode==='bpm'?'+'+(S.fmStep||10)+' BPM':S.fmMode==='lvl'?`${S.level}→${LMAX()}`:'—';
   $('fsTiles').innerHTML=
     T('mode','מבנה','📈',FS_MODE[S.fmMode])+T('rounds','סבבים','🔁',one?'—':S.fmRounds,'',one)+T('step',S.fmMode==='bpm'?'קפיצה':'רמות','↗',step,'o',one||S.fmMode==='lvl')+
     T('lay','פריסה','▦',FS_LAY[S.fmLay||'half'])+T('count','ספירה','🥁',S.fmCount?'פועלת':'כבויה',S.fmCount?'':'off')+T('text','טקסט','Aa','ערוך')+
@@ -5282,7 +5329,7 @@ function updateQuick(){
   $('qMeter').innerHTML=FRAC(S.num,S.den); $('vMeter').outerHTML=vizDots(S.num).replace('class="viz','id="vMeter" class="viz');
   $('qBars').textContent=S.bars; $('vBars').className='viz vsegs'+(S.bars>8?' many':''); $('vBars').innerHTML='<i></i>'.repeat(Math.min(S.bars,12));
   const man=(S.mode||'free')==='manual', L=S.level; $('qLevel').textContent=man?'ידני':L; $('qLevel').className=man?'':'hot';
-  $('vLevel').className='viz vfire'; $('vLevel').innerHTML=[...Array(5)].map((_,i)=>`<i class="${!man&&i<Math.ceil(L/2)?'on':''}" style="height:${30+i*17}%;--c:${LVL_C[Math.min(9,i*2+1)]}"></i>`).join('');
+  $('vLevel').className='viz vfire'; $('vLevel').innerHTML=[...Array(5)].map((_,i)=>`<i class="${!man&&i<Math.ceil(L/LMAX()*5)?'on':''}" style="height:${30+i*17}%;--c:${LVL_C[Math.min(9,i*2+1)]}"></i>`).join('');
   $('qBpm').textContent=S.bpm; $('qTempo').textContent=tempoName(S.bpm).toUpperCase();
   $('mMeterBtn').innerHTML=FRAC(S.mBeats,4); $('vMBeats').outerHTML=vizDots(S.mBeats,S.mAcc).replace('class="viz','id="vMBeats" class="viz');
   $('qMSub').textContent=SUBN[S.mSub]; $('vMSub').innerHTML=SUBI[S.mSub];
@@ -5451,13 +5498,15 @@ $('level').value=S.level; $('levelOut').textContent=S.level;
 // vertical "fire" slider: bottom = easiest, top = pro; heats up toward red and glows at the top
 const LVL_C=['#ffd29a','#ffc27a','#ffb347','#ffa63a','#ff9f1c','#ff8a1c','#ff7a1c','#ff6a2a','#ff4a1f','#ff2a10'];
 const LVL_N=['מתחיל','מתחיל','בסיסי','בסיסי','בינוני','בינוני','מתקדם','מתקדם','קשה','מקצוען'];
-function lvlUI(v){ v=clamp(Math.round(v),1,10); const h=(v-1)/9, box=$('lvlBox');
-  box.style.setProperty('--c',LVL_C[v-1]); box.style.setProperty('--heat',h.toFixed(3)); box.classList.toggle('hot',v>=9);
+// path mode has 13 levels, free mode 10; colors and names stretch over whichever it is
+function lvlUI(v){ const M=LMAX(); v=clamp(Math.round(v),1,M); const h=(v-1)/(M-1), ci=Math.round(h*9), box=$('lvlBox');
+  if($('lvlTicks').children.length!==M) $('lvlTicks').innerHTML='<i></i>'.repeat(M); $('lvlTrack').setAttribute('aria-valuemax',M);
+  box.style.setProperty('--c',LVL_C[ci]); box.style.setProperty('--heat',h.toFixed(3)); box.classList.toggle('hot',h>=0.85);
   $('lvlFill').style.height=`calc(54px + (100% - 64px) * ${h.toFixed(3)})`; $('lvlThumb').style.bottom=`calc(32px + (100% - 64px) * ${h.toFixed(3)})`;
-  $('levelOut').textContent=v; $('levelName').textContent=LVL_N[v-1]; $('lvlTrack').setAttribute('aria-valuenow',v); }
-function lvlSet(v){ v=clamp(Math.round(v),1,10); lvlUI(v); if(v===S.level) return; S.level=v; $('level').value=v; save(); updateQuick(); regen(); }
+  $('levelOut').textContent=v; $('levelName').textContent=LVL_N[ci]; $('lvlTrack').setAttribute('aria-valuenow',v); }
+function lvlSet(v){ v=clamp(Math.round(v),1,LMAX()); lvlUI(v); if(v===S.level) return; S.level=v; $('level').value=v; save(); updateQuick(); regen(); }
 (()=>{ const tr=$('lvlTrack'); let drag=false, last=S.level;
-  const at=e=>{ const r=tr.getBoundingClientRect(); return 1+clamp((r.bottom-32-e.clientY)/(r.height-64),0,1)*9; };
+  const at=e=>{ const r=tr.getBoundingClientRect(); return 1+clamp((r.bottom-32-e.clientY)/(r.height-64),0,1)*(LMAX()-1); };
   tr.addEventListener('pointerdown',e=>{ drag=true; tr.setPointerCapture(e.pointerId); last=Math.round(at(e)); lvlUI(last); if(S.uiSnd) uiTick(); });
   tr.addEventListener('pointermove',e=>{ if(!drag) return; const v=Math.round(at(e)); if(v!==last){ last=v; lvlUI(v); if(S.uiSnd) uiTick(); } });
   const up=()=>{ if(!drag) return; drag=false; lvlSet(last); };
@@ -5490,13 +5539,13 @@ function modeUI(){
   $('modeSeg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===m)));
   $('lvlBox').hidden=m==='manual'; $('pathPart').hidden=m!=='path'; $('freePart').hidden=m!=='free'; $('manPart').hidden=m!=='manual';
   if(m==='path'){ const d=S.trkD!==false, t=!!S.trkT||!d; $('trkD').setAttribute('aria-pressed',String(d)); $('trkT').setAttribute('aria-pressed',String(t));
-    const L=S.level, part=(on,name,D)=>on?`<div><b>${name}:</b> ${L>1?D.slice(0,L-1).join(' · ')+' · ':''}<span class="new">${L<10?'חדש: ':''}${D[L-1]}</span></div>`:'';
+    const L=Math.min(S.level,PATH_MAX), part=(on,name,D)=>{ if(!on) return ''; const old=D.slice(0,L-1).filter(Boolean), nw=D[L-1]; return `<div><b>${name}:</b> ${old.join(' · ')}${old.length&&nw?' · ':''}${nw?`<span class="new">חדש: ${nw}</span>`:(old.length?'':'—')}</div>`; };
     $('pathInc').innerHTML=`<b>רמה ${L} כוללת</b>`+part(d,'מרובעים',DESC_D)+part(t,'משולשים',DESC_T); }
   if(m==='free'){ const mk=list=>list.map(([g,n])=>`<button class="gc" data-g="${g}" aria-pressed="${!!S.grids[g]}">${gIcon(g)}<small>${n}</small></button>`).join(''); $('freeD').innerHTML=mk(FREE_D); $('freeT').innerHTML=mk(FREE_T); }
   if(m==='manual') manRender();
 }
 $('trkDIc').innerHTML=SUBI[1]+SUBI[2]+SUBI[4]; $('trkTIc').innerHTML=SUBI[3]+SUBI[6];
-$('modeSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.m===S.mode) return; S.mode=b.dataset.m; save(); updateQuick(); modeUI(); regen(); };
+$('modeSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.m===S.mode) return; S.mode=b.dataset.m; if(S.level>LMAX()) S.level=LMAX(); $('level').value=S.level; lvlUI(S.level); save(); updateQuick(); modeUI(); regen(); };
 const trkToggle=k=>{ const d=S.trkD!==false, t=!!S.trkT||!d; if(k==='d'){ if(d&&!t) return; S.trkD=!d; if(!S.trkD) S.trkT=true; } else { if(t&&!d) return; S.trkT=!t; } save(); updateQuick(); modeUI(); regen(); };
 $('trkD').onclick=()=>trkToggle('d'); $('trkT').onclick=()=>trkToggle('t');
 $('freePart').onclick=e=>{ const c=e.target.closest('.gc'), a=e.target.closest('.gall');
@@ -5524,8 +5573,8 @@ $('manGroups').onclick=e=>{
   else return;
   S.manual=[...set]; save(); updateQuick(); if(a||z) manRender(); else $('manCount').textContent=`${set.size} צורות נבחרו`; clearTimeout(manRender._t); manRender._t=setTimeout(regen,350);
 };
-['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd','askDelOn'].forEach(k=>{
-  const el=$(k); el.checked=!!S[k]; el.onchange=()=>{S[k]=el.checked; save(); updateQuick(); if(k==='gapOn') gapUI(); if((k==='showCount'||k==='ties')&&rhythm) render();};
+['clickOn','noteSound','countIn','showCount','ties','dots','gapOn','uiSnd','askDelOn'].forEach(k=>{
+  const el=$(k); el.checked=!!S[k]; el.onchange=()=>{S[k]=el.checked; save(); updateQuick(); if(k==='gapOn') gapUI(); if((k==='showCount'||k==='ties'||k==='dots')&&rhythm) render();};
 });
 ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>bindNum(k,k));
 const secSync=()=>{ $('trMin').value=Math.floor(S.trSec/60); $('trSecs').value=S.trSec%60; if(typeof trSetUI==='function') trSetUI(); };
@@ -5937,7 +5986,7 @@ function applyPhoneS(ns){
   syncUI();
   const ch=k=>JSON.stringify(old[k])!==JSON.stringify(S[k]);
   if(old.bpm!==S.bpm) retime(old.bpm);
-  if(['grids','level','num','den','bars'].some(ch)) requestNew(); else if(['restLvl','ties','showCount','sextCount','stick','dynOn'].some(ch)&&rhythm) render();
+  if(['grids','level','num','den','bars'].some(ch)) requestNew(); else if(['restLvl','ties','dots','showCount','sextCount','stick','dynOn'].some(ch)&&rhythm) render();
   RC.applying=false; save(); hostSendState(true);
 }
 /* computer side: send the screen to the phone */
@@ -5975,7 +6024,7 @@ function syncUI(){
   setBpm(S.bpm); syncGrids(); meterSync(); barsSync(); mbSync();
   ['repeats','mSub','sextCount','trMode','clockMode','clickSnd'].forEach(id=>{ const el=$(id); el&&el._sync&&el._sync(); });
   $('level').value=S.level; $('levelOut').textContent=S.level; restSync(); sndDraw(); gapUI(); trSetUI(); dynMaxUI();
-  ['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]); $('stickOn').checked=!!S.stick;
+  ['clickOn','noteSound','countIn','showCount','ties','dots','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]); $('stickOn').checked=!!S.stick;
   ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>$(k).value=S[k]);
   secSync(); buildCols(); renderSongs(); renderTrPresets(); renderGenPresets(); updateQuick(); clockTick(); applyVol();
 }
