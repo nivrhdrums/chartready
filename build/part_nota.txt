@@ -1,0 +1,249 @@
+/* ---------- notation ---------- */
+const SP=10, L=62, STEMTOP=L-3.5*SP, HW=11.8, SW=1.3, PADL=10;
+const GL={whole:'',half:'',black:'',f8:'',f16:'',r1:'',r2:'',r4:'',r8:'',r16:'',dot:''};
+const NV={3:{h:'black',b:2},6:{h:'black',b:1},9:{h:'black',b:1,d:1},12:{h:'black',b:0},18:{h:'black',b:0,d:1},24:{h:'half',b:0},36:{h:'half',b:0,d:1},48:{h:'whole',b:0}};
+const RV={3:['r16'],6:['r8'],9:['r8',1],12:['r4'],18:['r4',1],24:['r2'],36:['r2',1],48:['r1']};
+function rng(seed){return ()=>{seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function greedy(n,vals){const out=[];for(const v of vals){while(n>=v-1e-9){out.push(v);n-=v;}}return out;}
+const isInt=x=>Math.abs(x-Math.round(x))<1e-9;
+// Turns generated hits into written notes. opt: {p: rest level 0..1, feel:'d'|'t', longBroken, ties}
+function notate(bar,r,seed,opt){
+  opt=opt||{};
+  const p=opt.p!=null?opt.p:S.restLvl/100, ties=opt.ties!=null?opt.ties:S.ties, up=r.den===4?12:6, R=rng(seed||1);
+  const ch=x=>x>=1?true:x<=0?false:R()<x;
+  const groups=[], toks=[]; let brId=0, tk=0;
+  const mk=(g,kind,tick,dur,tup,br)=>{const t={kind,tick,dur,grp:g,tup:!!tup,br}; toks.push(t); return t;};
+  function tokenize(g,on,s0,n,u,vals,mode,tup,br){
+    let i=s0; const end=s0+n;
+    while(i<end){
+      let j=i+1; while(j<end&&!on[j]) j++;
+      if(on[i]){
+        const nv=mode==='rests'?1:vals.find(v=>v<=j-i);
+        mk(g,'note',g.start+i*u,nv*u,tup,br); let q=i+nv;
+        greedy(j-i-nv,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;});
+      } else { let q=i; greedy(j-i,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;}); }
+      i=j;
+    }
+  }
+  function sext(g,on,u,mode){
+    const s=on.map(x=>x?'1':'0').join(''), okH=h=>h==='100'||h==='111'||h==='000';
+    const dOk=okH(s.slice(0,3))&&okH(s.slice(3)), tOk=s.indexOf('1')%2===0;
+    g.simple=dOk;
+    let feel;
+    if(s==='000001'){ feel='d'; mode='extend'; }
+    else if(opt.feel&&(opt.feel==='d'?dOk:tOk)) feel=opt.feel;
+    else if(dOk&&tOk) feel=ch(.5)?'d':'t';
+    else if(dOk) feel='d'; else if(tOk) feel='t';
+    else feel=mode==='extend'?'d':(ch(.5)?'d':'t3');
+    if(feel==='d'){
+      [0,3].forEach(o=>{
+        const hp=s.slice(o,o+3);
+        if(hp==='000'){ mk(g,'rest',g.start+o*u,3*u,0,null); return; }
+        if(hp==='100'&&mode==='extend'){ mk(g,'note',g.start+o*u,3*u,0,null); return; }
+        tokenize(g,on,o,3,u,[2,1],mode,1,brId++);
+      });
+    } else {
+      const br=brId++;
+      if(feel==='t'&&mode==='extend') tokenize(g,on,0,6,u,[4,3,2,1],'extend',1,br);
+      else [0,2,4].forEach(o=>tokenize(g,on,o,2,u,[2,1],'extend',1,br));
+    }
+  }
+  function processQ(bt,start,len){
+    const hits=[]; bt.slots.forEach((h,i)=>{ if(h) hits.push(i*len/bt.g); });
+    const restMode=ch(p), raw=restMode&&ch(p);
+    let G=bt.g;
+    if(!raw){ if(!hits.length) G=bt.t==='q'?1:bt.k; else G=(bt.t==='q'?[1,2,3,4,6]:[bt.k,2*bt.k]).find(c=>hits.every(o=>isInt(o*c/len))); }
+    const g={t:bt.t,k:bt.k,start,len,G,tup:bt.t==='q'&&(G===3||G===6)?G:0}; groups.push(g);
+    const u=len/G, on=new Array(G).fill(false); hits.forEach(o=>on[Math.round(o/u)]=true);
+    const mode=restMode?'rests':'extend';
+    if(g.tup===6){ sext(g,on,u,mode); return; }
+    const vals=g.t==='q'?{1:[1],2:[2,1],4:[4,3,2,1],3:[2,1]}[G]:(G===g.k?[3,2,1]:[6,4,3,2,1]).filter(v=>v<=G);
+    tokenize(g,on,0,G,u,vals,mode,g.tup,g.tup?brId++:null);
+  }
+  bar.forEach(bt=>{
+    const len=bt.k*up, start=tk; tk+=len;
+    if(bt.t!=='L'){ processQ(bt,start,len); return; }
+    const hitsT=[]; bt.slots.forEach((h,i)=>{ if(h) hitsT.push(start+i*len/bt.g); });
+    const broken=opt.longBroken!=null?opt.longBroken:ch(p);
+    if(broken){
+      for(let b=0;b<bt.k;b++){ const s=start+b*12; processQ({t:'q',k:1,g:3,slots:[0,1,2].map(i=>hitsT.some(h=>Math.abs(h-(s+i*4))<1e-9))},s,12); }
+      return;
+    }
+    const g={t:'L',k:bt.k,start,len,G:6,tup:3,long:true}; groups.push(g);
+    const u=len/6, br=brId++;
+    [0,1,2].forEach(c=>{
+      const a=bt.slots[c*2], z=bt.slots[c*2+1], t0=start+c*2*u;
+      if(a&&z){ mk(g,'note',t0,u,1,br); mk(g,'note',t0+u,u,1,br); }
+      else if(a) mk(g,'note',t0,2*u,1,br);
+      else if(z){ mk(g,'rest',t0,u,1,br); mk(g,'note',t0+u,u,1,br); }
+      else mk(g,'rest',t0,2*u,1,br);
+    });
+  });
+  const total=tk, plain=g=>!g.tup&&!g.long;
+  if(r.den===4){
+    for(let x=0;x<toks.length;x++){
+      const N=toks[x];
+      if(N.kind!=='note'||!plain(N.grp)||N.tick+N.dur!==N.grp.start+N.grp.len) continue;
+      let y=x+1; while(y<toks.length&&toks[y].kind==='rest') y++;
+      if(y===x+1) continue;
+      let stop=y<toks.length?toks[y].tick:total;
+      for(let z=x+1;z<=y&&z<toks.length;z++) if(!plain(toks[z].grp)){ stop=Math.min(stop,toks[z].grp.start); break; }
+      const avail=stop-N.tick;
+      const c=[48,36,24,18,12].find(d=>d>N.dur&&d<=avail&&(d===48?N.tick===0:d>=24?N.tick%12===0:N.tick%6===0));
+      const nx=toks[x+1], canTie=ties&&nx.kind==='rest'&&plain(nx.grp)&&nx.tick===N.tick+N.dur;
+      const opts=[]; if(c&&!bar.noExt) opts.push('ext'); if(canTie) opts.push('tie');
+      if(!opts.length||ch(p)) continue;
+      const pick=opts[Math.floor(R()*opts.length)];
+      if(pick==='tie'){ nx.kind='note'; nx.tied=true; N.tieTo=nx; continue; }
+      const E=N.tick+c; N.dur=c;
+      const keep=[];
+      for(let z=x+1;z<y;z++){
+        const t=toks[z], te=t.tick+t.dur;
+        if(te<=E) continue;
+        if(t.tick>=E){ keep.push(t); continue; }
+        let q=E; greedy(te-E,[12,9,6,3]).forEach(v=>{keep.push({kind:'rest',tick:q,dur:v,grp:t.grp,tup:false,br:null});q+=v;});
+      }
+      toks.splice(x+1,y-x-1,...keep);
+    }
+    for(let x=0;x<toks.length-1;x++){
+      const a=toks[x], b=toks[x+1];
+      if(a.kind==='rest'&&b.kind==='rest'&&!a.tup&&!b.tup&&a.dur===12&&b.dur===12&&a.tick%24===0&&b.tick===a.tick+12&&plain(a.grp)&&plain(b.grp)&&!ch(p)){ a.dur=24; toks.splice(x+1,1); }
+    }
+  }
+  return {groups,toks,total,den:r.den,num:r.num};
+}
+function groupW(g,used){ if(g.long) return g.k===2?150:240; if(!used) return 34; if(g.t==='e') return (g.G===g.k?24:15)*g.G+12; return {1:40,2:52,3:80,4:76,6:110}[g.G]; }
+function layoutBar(bar,r,opt){
+  const nt=notate(bar,r,bar.seed,opt), used=new Set(nt.toks.map(t=>t.grp));
+  // a flagged note right before a longer note in a tuplet (8th then quarter) gets extra room for its flag
+  const flagGap=g=>{ if(!g.tup) return 0; const ts=nt.toks.filter(t=>t.grp===g); return ts.some((t,i)=>t.kind==='note'&&ts[i+1]&&ts[i+1].kind==='note'&&t.dur<ts[i+1].dur)?10:0; };
+  let x=PADL; nt.groups.forEach(g=>{g.w=groupW(g,used.has(g))+flagGap(g); g.x=x; x+=g.w;});
+  nt.width=x+10; return nt;
+}
+const tickX=(g,t)=>g.x+8+(t-g.start)/g.len*(g.w-16);
+function syl(t,g){
+  if(g.t==='e'){ const u=t/6; return isInt(u)?String(Math.round(u)+1):'&'; }
+  const b=Math.floor(t/12+1e-9), f=(t-b*12)/12, n=String(b+1);
+  if(g.long||g.tup===3) return [n,'&','a'][Math.round(f*3)]||n;
+  if(g.tup===6){ const i=Math.round(f*6), m=S.sextCount||'mix'; return (m==='eighth'||(m==='mix'&&g.simple))?[n,'','','&','',''][i]:String(i+1); }
+  return [n,'e','&','a'][Math.round(f*4)];
+}
+const mg=(ch,x,y)=>`<text class="mg" x="${x.toFixed(1)}" y="${y}">${ch}</text>`;
+function tupletsPossible(){
+  const m=S.mode||'free';
+  if(m==='path') return !!S.trkT||S.trkD===false;
+  if(m==='manual') return (S.manual||[]).some(c=>c[0]!=='4');
+  return !!(S.grids[3]||S.grids[6]||S.grids.L);
+}
+function svgBar(bar,bi,r,width,opt){
+  const nt=layoutBar(bar,r,opt), H=S.showCount?100:80;
+  const stick=!!(S.dynOn&&S.stick), CY=stick?L+43:L+32;
+  const kx=(width-PADL-10)/(nt.width-PADL-10), X=x=>PADL+(x-PADL)*kx;
+  // inside a tuplet a flagged note before a longer one (8th then quarter) pushes the next note right so the flag never touches it
+  const TXS=new Map();
+  nt.groups.forEach(g=>{ if(!g.tup) return; const ts=nt.toks.filter(t=>t.grp===g);
+    ts.forEach((t,i)=>{ const p=ts[i-1]; if(p&&p.kind==='note'&&t.kind==='note'&&p.dur<t.dur){ const px=TXS.get(p)??X(tickX(g,p.tick)); TXS.set(t,Math.max(X(tickX(g,t.tick)),px+HW+15)); } }); });
+  const tx=t=>TXS.get(t)??X(tickX(t.grp,t.tick));
+  const nd=t=>t.tup?t.dur*3/2:t.dur;
+  const id=t=>`n${bi}_${Math.round(t.tick)}`;
+  const sx=t=>tx(t)+HW-SW/2;
+  let s=`<line class="staff" x1="0" y1="${L}" x2="${width}" y2="${L}"/>`;
+  const runs=[];
+  nt.groups.forEach(g=>{
+    let run=[];
+    nt.toks.filter(t=>t.grp===g).forEach(t=>{
+      if(t.kind==='rest') return;
+      if((NV[nd(t)]||NV[12]).b>0) run.push(t); else { if(run.length) runs.push(run); run=[]; }
+    });
+    if(run.length) runs.push(run);
+  });
+  const beamed=new Set(); runs.forEach(rn=>{ if(rn.length>1) rn.forEach(t=>beamed.add(t)); });
+  nt.toks.forEach(t=>{
+    const x=tx(t), v=nd(t);
+    if(t.kind==='rest'){ const [g,dot]=RV[v]||RV[12]; s+=mg(GL[g],x-2,L); if(dot) s+=mg(GL.dot,x+12,L-5); return; }
+    const info=NV[v]||NV[12];
+    // hollow heads: a thin outline with no staff line showing through
+    const hx=x+(info.h==='whole'?7.2:5.9), hole=info.h==='whole'?`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="3" ry="4" transform="rotate(-30 ${hx.toFixed(1)} ${L})"/>`:`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="4.8" ry="3" transform="rotate(-25 ${hx.toFixed(1)} ${L})"/>`;
+    let inner=info.h==='black'?mg(GL[info.h],x,L):info.h==='whole'?hole+mg(GL[info.h],x,L):mg(GL[info.h],x,L)+hole;
+    if(info.h!=='whole') inner+=`<line class="stem" x1="${sx(t)}" y1="${L-1.7}" x2="${sx(t)}" y2="${STEMTOP}"/>`;
+    if(info.b&&!beamed.has(t)) inner+=mg(info.b===2?GL.f16:GL.f8,x+HW-SW,STEMTOP);
+    s+=t.tied?`<g>${inner}</g>`:`<g class="n" id="${id(t)}">${inner}</g>`;
+    // a flagged note's dot goes past the flag so it doesn't sit inside the curl
+    if(info.d) s+=mg(GL.dot,x+HW+(info.b&&!beamed.has(t)?13:4),L-5);
+  });
+  nt.toks.forEach(t=>{ if(!t.tieTo) return; const x1=tx(t)+7, x2=tx(t.tieTo)+5, m=(x1+x2)/2;
+    s+=`<path class="tie" d="M${x1} ${L+7} Q${m} ${L+17} ${x2} ${L+7} Q${m} ${L+13} ${x1} ${L+7}Z"/>`; });
+  runs.forEach(rn=>{
+    if(rn.length<2) return;
+    const a=sx(rn[0]), b=sx(rn[rn.length-1]);
+    s+=`<rect class="beam" x="${a-SW/2}" y="${STEMTOP}" width="${b-a+SW}" height="5"/>`;
+    const two=q=>q&&(NV[nd(q)]||NV[12]).b===2;
+    rn.forEach((t,k)=>{
+      if(!two(t)) return;
+      const nx=rn[k+1], pv=rn[k-1];
+      if(two(nx)) s+=`<rect class="beam" x="${sx(t)-SW/2}" y="${STEMTOP+7.5}" width="${sx(nx)-sx(t)+SW}" height="5"/>`;
+      else if(!two(pv)){ const x1=k===rn.length-1?sx(t)-8:sx(t); s+=`<rect class="beam" x="${x1-SW/2}" y="${STEMTOP+7.5}" width="${8+SW}" height="5"/>`; }
+    });
+  });
+  const brs={}; nt.toks.forEach(t=>{ if(t.br!=null) (brs[t.br]=brs[t.br]||[]).push(t); });
+  Object.values(brs).forEach(ts=>{
+    const last=ts[ts.length-1], endT=Math.max(...ts.map(t=>t.tick+t.dur)), flagged=last.kind==='note'&&!beamed.has(last)&&(NV[nd(last)]||NV[12]).b;
+    const a=tx(ts[0])+(ts[0].kind==='note'?4:0), b=Math.max(tx(last)+HW+(flagged?14:6), X(tickX(last.grp,endT))-6), m=(a+b)/2, accIn=(bar.acc||[]).some(k=>ts.some(t=>t.kind==='note'&&Math.round(t.tick)===k)), y=accIn?STEMTOP-19:STEMTOP-6;
+    s+=`<path class="tripline" d="M${a} ${y+6} v-6 H${m-7} M${m+7} ${y} H${b} v6"/><text class="trip" x="${m}" y="${y+4}">3</text>`;
+  });
+  if(S.showCount){
+    // every count position of each beat, at the finest subdivision that beat uses
+    const hitAt=new Set(nt.toks.filter(t=>t.kind==='note'&&!t.tied).map(t=>Math.round(t.tick)));
+    const tokAt=new Map(nt.toks.map(t=>[Math.round(t.tick),t])), done=new Set();
+    const put=(g,tt)=>{ const k=Math.round(tt); if(done.has(k)) return; const lab=syl(tt,g); if(!lab) return; done.add(k);
+      const t=tokAt.get(k), x=t?tx(t):X(tickX(g,tt));
+      s+=`<text class="cnt${hitAt.has(k)?' hit':''}"${t?` id="c${id(t)}"`:''} x="${(x+HW/2).toFixed(1)}" y="${CY}">${lab}</text>`; };
+    nt.groups.forEach(g=>{
+      if(g.long){ for(let i=0;i<g.k*3;i++) put(g,g.start+i*4); return; }
+      let G=g.G;
+      if(!g.tup){ const offs=nt.toks.filter(t=>t.tick>=g.start-1e-9&&t.tick<g.start+g.len-1e-9).map(t=>t.tick-g.start);
+        G=(g.t==='q'?[1,2,4]:[g.k,2*g.k]).find(c=>offs.every(o=>isInt(o*c/g.len)))||G; }
+      for(let i=0;i<G;i++) put(g,g.start+i*g.len/G);
+    });
+  }
+  if((bar.acc&&bar.acc.length)||(S.dynOn&&S.stick)){
+    const acc=new Set(bar.acc||[]), hm=S.dynOn&&S.stick?stickMap(bar,r.den):null;
+    nt.toks.forEach(t=>{ if(t.kind!=='note'||t.tied) return; const k=Math.round(t.tick), cx=tx(t)+HW/2;
+      if(acc.has(k)){ const ax=t.dur>=48?cx:sx(t), ay=STEMTOP-8; s+=`<path class="accent" d="M${(ax-5.5).toFixed(1)} ${ay-4} L${(ax+5.5).toFixed(1)} ${ay} L${(ax-5.5).toFixed(1)} ${ay+4}"/>`; }
+      if(hm&&hm.has(k)) s+=`<text class="stk${hm.get(k)==='L'?' l':''}" x="${cx.toFixed(1)}" y="${L+31}">${hm.get(k)}</text>`; });
+  }
+  s+=`<line class="barline" x1="${width-1}" y1="${L-16}" x2="${width-1}" y2="${L+16}"/>`;
+  // crop to what this bar uses: room for a tuplet bracket only when there is one, the count row only when shown
+  // every bar on screen gets the same crop so all bars are drawn at the same size:
+  // room for a tuplet bracket whenever the current style can produce one
+  // accents sit just above the stems; inside a tuplet the bracket is lifted above them
+  const tupOn=tupletsPossible()||nt.groups.some(g=>g.tup||g.long), Y0=S.dynOn?(tupOn?STEMTOP-26:STEMTOP-14):(tupOn?STEMTOP-13:STEMTOP-3), Y1=S.showCount?CY+4:stick?L+33:L+19;
+  return `<svg viewBox="0 ${Y0} ${width} ${Y1-Y0}" role="img" aria-label="תיבה ${typeof bi==='number'?bi+1:'הבאה'}">${s}</svg>`;
+}
+let rhythm=null, layoutW=360, shown=[];
+const widthFor=r=>Math.max(270,...r.bars.map(b=>layoutBar(b,r).width));
+const barHTML=(b,i,r)=>`<div class="barbox" id="bar${i}"><div class="barnum">${i+1}</div>${svgBar(b,i,r,layoutW)}</div>`;
+function render(r){ r=r||rhythm; layoutW=widthFor(r); shown=r.bars.slice(); $('score').innerHTML=r.bars.map((b,i)=>barHTML(b,i,r)).join(''); $('score').scrollTop=0; HIST.slot=[]; r.bars.forEach((b,i)=>histPush(i,b,r)); }
+function swapBar(i,r){ const el=$('bar'+i); if(!el) return; layoutW=Math.max(layoutW,widthFor(r)); shown[i]=r.bars[i]; el.outerHTML=barHTML(r.bars[i],i,r); histPush(i,r.bars[i],r); const n=$('bar'+i); if(n) n.classList.add('fresh'); }
+function showPreview(r){ clearPreview(); $('score').insertAdjacentHTML('beforeend',`<div class="barbox preview" id="barNext"><div class="barnum">הבא</div>${svgBar(r.bars[0],'x',r,layoutW)}</div>`); }
+function clearPreview(){ const p=$('barNext'); if(p) p.remove(); }
+function setCurBar(b,total,rep){
+  if(HIST.slot[b]) HIST.slot[b].p=true;
+  document.querySelectorAll('.barbox').forEach(el=>el.classList.toggle('cur',el.id==='bar'+b));
+  const el=$('bar'+b), sc=$('score');
+  // when the score scrolls, keep the playing bar near the top so the next bars are visible below it
+  if(el&&sc.scrollHeight>sc.clientHeight+4){ const top=el.offsetTop-sc.offsetTop-6; if(Math.abs(sc.scrollTop-top)>4) sc.scrollTo({top,behavior:'smooth'}); }
+  $('liveMain').textContent=`תיבה ${b+1} / ${total}`;
+  $('liveSub').textContent=(S.repeats>0?`חזרה ${rep+1}/${S.repeats} · `:'')+`\u2066${S.bpm} BPM\u2069`;
+}
+// canonical pattern code, same as the rhythm map
+function beatCode(bt){
+  if(bt.t==='L'){ return `${bt.k===2?'Q':'H'}:${bt.slots.map(x=>x?1:0).join('')}`; }
+  const on=[]; bt.slots.forEach((h,i)=>{ if(h) on.push(i*12/bt.g); });
+  for(const g of [4,3,6]) if(on.every(o=>isInt(o*g/12))){ const b=new Array(g).fill(0); on.forEach(o=>b[Math.round(o*g/12)]=1); return `${g}:${b.join('')}`; }
+  return '';
+}
+const EXCL=new Set(["6:000011", "6:000101", "6:000110", "6:001001", "6:001011", "6:001100", "6:001101", "6:001110", "6:010000", "6:010001", "6:010010", "6:010011", "6:010100", "6:010101", "6:010110", "6:010111", "6:011000", "6:011001", "6:011010", "6:011011", "6:011100", "6:011101", "6:011110", "6:100001", "6:100011", "6:100101", "6:100110", "6:101001", "6:101100", "6:101101", "6:110000", "6:110001", "6:110010", "6:110011", "6:110100", "6:110101", "6:111000", "6:111001", "H:000010", "H:000011", "H:001000", "H:001010", "H:001011", "H:001100", "H:001110", "H:001111", "H:100000", "H:100010", "H:100011", "H:101000", "H:101011", "H:101100", "H:101110", "H:101111", "H:110000", "H:110010", "H:110011", "H:111000", "H:111010", "H:111011", "H:111100", "H:111110", "H:111111", "Q:000011", "Q:001011", "Q:001100", "Q:001110", "Q:001111", "Q:100011", "Q:101011", "Q:101100", "Q:101110", "Q:101111", "Q:110000", "Q:110010", "Q:110011", "Q:111000", "Q:111010", "Q:111011", "Q:111100", "Q:111110", "Q:111111"]);
+const ALLOW={};
+function allowed(key,make){ if(!ALLOW[key]) ALLOW[key]=make().filter(bt=>!EXCL.has(beatCode(bt))); return ALLOW[key]; }
+

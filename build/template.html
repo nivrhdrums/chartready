@@ -1,0 +1,3735 @@
+<title>ChartReady</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Secular+One&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: phone-first practice screen. Top: name + quick stat tiles (each opens a small popup). Middle: the active tab (reading bars / metronome dial / trainer steps). Bottom: transport + 4-tab bar. Dark-only, like a stage. */
+:root{
+  --bg:#0c0e12; --card:#1b2028; --panel:#232934; --raise:#2c3340; --ink:#eef1f6; --muted:#8e98a8;
+  --line:#353d4a; --accent:#6f8dff; --accent-ink:#0c0e12; --accent-soft:#25304f; --good:#5fd4a0; --hot:#ff9b6f;
+  --f-display:"Secular One","Assistant",system-ui,sans-serif;
+  --f-body:"Assistant",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+@font-face{font-family:"LelandN";src:url(data:font/woff;base64,{{FONT}}) format("woff");font-display:block}
+.mg{font-family:"LelandN";font-size:40px;fill:var(--ink)}
+.beam,.tie{fill:var(--ink)}
+.hole{fill:var(--card)}
+.barbox.cur .hole{fill:var(--accent-soft)}
+
+.n.on .mg{fill:var(--accent);filter:drop-shadow(0 0 5px var(--accent))}
+[hidden]{display:none!important}
+html,body{height:100%;background:var(--bg);color:var(--ink)}
+body{margin:0;overflow:hidden;font-family:var(--f-body);font-size:16px;line-height:1.4;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+button{font-family:inherit;color:inherit;touch-action:manipulation}
+html{overscroll-behavior:none;-webkit-text-size-adjust:100%}
+input[type=number]{cursor:pointer;caret-color:transparent}
+input[type=range]{height:32px}
+input[type=range]::-webkit-slider-thumb{width:26px;height:26px}
+.screen{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding-block:8px 8px;box-sizing:border-box}
+header{position:relative;display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.hdrbtn{position:absolute;right:0;top:50%;transform:translateY(-50%);width:42px;height:42px;border:0;border-radius:12px;background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.hdrbtn svg{width:24px;height:24px}
+.hdrbtn .x{display:none}
+.hdrbtn.muted .x{display:inline}
+.hdrbtn.muted .w{display:none}
+.hdrbtn.muted{color:var(--hot)}
+.remind{position:absolute;left:0;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:6px;font:600 12px var(--f-body);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 9px}
+.remind i{width:8px;height:8px;border-radius:50%;background:#5b6475}
+.remind.on{color:var(--good);border-color:#2f5a48}
+.remind.on i{background:var(--good);box-shadow:0 0 6px var(--good)}
+.remsec{background:transparent;padding:4px 0}
+.remlock{align-self:center;border:0;background:transparent;color:#4f5867;font:600 13px var(--f-body);cursor:pointer;padding:8px}
+#remPanel{background:var(--panel);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.remstate{display:flex;align-items:center;gap:8px;font-weight:600}
+.remstate i{width:10px;height:10px;border-radius:50%;background:#5b6475;flex-shrink:0}
+.remstate i.on{background:var(--good);box-shadow:0 0 6px var(--good)}
+.qr{width:200px;max-width:70%;align-self:center;background:#fff;border-radius:12px;padding:6px}
+.qr svg{display:block;width:100%;height:auto}
+.url{direction:ltr;text-align:center;word-break:break-all;font:500 12px var(--f-num);color:var(--muted)}
+.remote .playbtn,.remote .dplay{box-shadow:0 0 0 3px var(--good),0 6px 24px -6px var(--accent)}
+.logo{font-family:var(--f-display);font-size:25px;letter-spacing:.3px;direction:ltr}
+.logo span{color:var(--accent)}
+.tag{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.by{font-size:10px;color:#5d6676;margin-top:2px;letter-spacing:.02em}
+/* stat tiles */
+.quick{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--panel);border-radius:16px;padding:8px 4px}
+.q{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;cursor:pointer;border-radius:10px;min-width:0}
+.q small{font-size:12px;color:var(--muted);white-space:nowrap}
+.q b{font:600 19px var(--f-num);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.q:active{background:var(--raise)}
+.live{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--panel);border-radius:16px;padding:12px 16px;font-variant-numeric:tabular-nums}
+.live b{font:600 18px var(--f-num)}
+.live small{color:var(--muted);font-size:13px}
+/* reading score */
+.score{flex:1;min-height:0;overflow-y:auto;display:grid;gap:8px;align-content:start;scrollbar-width:none}
+.score::-webkit-scrollbar{display:none}
+.barbox{position:relative;background:var(--card);border-radius:12px;padding:4px 4px 2px;border:2px solid transparent;transition:border-color .12s,background .12s}
+.barbox{display:flex;flex-direction:column;min-height:0;box-sizing:border-box}
+.barbox svg{display:block;width:100%;flex:1;min-height:0}
+.barnum{position:absolute;top:3px;left:8px;font:600 11px var(--f-num);color:var(--muted);opacity:.6;z-index:1}
+.barbox.cur{border-color:var(--accent);background:var(--accent-soft)}
+.barbox.cur .barnum{color:var(--accent)}
+.barbox.fresh{animation:fresh .6s ease-out}
+@keyframes fresh{from{background:var(--raise)}to{background:var(--card)}}
+.barbox.preview{opacity:.45;border:2px dashed var(--line)}
+.staff{stroke:var(--ink);stroke-width:1.2}
+.barline{stroke:var(--ink);stroke-width:1.6}
+.stem{stroke:var(--ink);stroke-width:1.7}
+.n.on .stem{stroke:var(--accent)}
+.trip{font:600 12px var(--f-num);fill:var(--ink);text-anchor:middle}
+.tripline{stroke:var(--ink);stroke-width:1.1;fill:none}
+.cnt{font:500 11px var(--f-num);fill:#4f5867;text-anchor:middle}
+.cnt.hit{fill:var(--muted);font-weight:600}
+.cnt.now{fill:var(--accent)}
+/* metronome */
+.met{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:10px}
+.mmid{position:relative;width:100%;display:flex;justify-content:center;align-items:center;flex-shrink:0}
+.mmid .pill{position:absolute;left:0;top:50%;transform:translateY(-50%)}
+.mbpm b{cursor:text;font-size:clamp(44px,7.5vh,58px)!important}
+.bpmin{width:3.6ch;font:600 54px/1 var(--f-num);background:var(--panel);color:var(--ink);border:2px solid var(--accent);border-radius:12px;text-align:center;padding:2px 4px}
+.pill.dim{opacity:.55}
+.mbpm{display:flex;flex-direction:column;align-items:center;gap:0;direction:ltr;line-height:1}
+.mbpm b{font:600 58px/1 var(--f-num);font-variant-numeric:tabular-nums}
+.mbpm small{font:600 11px var(--f-body);color:var(--muted);letter-spacing:.12em;margin-top:2px}
+.msong{font:700 17px var(--f-body);color:var(--ink);margin-top:5px;background:var(--accent-soft);border-radius:999px;padding:3px 10px;direction:rtl;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbpm i{font-style:normal;color:var(--accent);font:400 16px var(--f-display);margin-top:2px}
+.gapb{position:absolute;right:0;top:50%;transform:translateY(-50%);max-width:30%;text-align:center;border:1px solid var(--line);border-radius:12px;padding:6px 10px;font:600 12px/1.3 var(--f-body);color:var(--muted);background:var(--panel)}
+.gapb.mute{border-color:var(--hot);color:var(--hot);background:#2a1d18}
+.seg8{display:grid;grid-template-columns:repeat(8,1fr);background:var(--bg);border-radius:14px;padding:4px;direction:ltr}
+.seg8 button{height:44px;border:0;background:transparent;border-radius:10px;font:600 18px var(--f-num);cursor:pointer;color:var(--ink)}
+.seg8 button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg8 .more{color:var(--muted)}
+.subg{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;direction:ltr}
+.subg .chip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 6px;border-radius:14px;background:var(--bg);min-height:0}
+.subg .chip svg{width:100%;max-width:54px;height:auto}
+.subg .chip small{font:600 11px var(--f-body);color:var(--muted);white-space:nowrap}
+.subg .chip[aria-pressed="true"] small{color:var(--accent)}
+.mbprev{height:76px}
+.cols.ghost .col{background:transparent;outline:1.5px dashed var(--line);outline-offset:-1.5px}
+.cols.ghost .col i{opacity:.12}
+.cols.ghost .col span{opacity:.5}
+.pill{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 12px;font:600 14px var(--f-num);cursor:pointer;display:flex;align-items:center;gap:6px}
+.pill svg{width:15px;height:15px}
+.pill.run{border-color:var(--accent);color:var(--accent)}
+.cols{width:100%;display:flex;gap:6px;height:clamp(52px,10vh,84px);flex-shrink:0;direction:ltr}
+.col{flex:1;border:0;padding:0;background:var(--card);border-radius:10px;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;position:relative;min-width:0}
+.col i{display:block;background:var(--raise);transition:background .06s}
+.col[data-a="2"] i{height:100%;background:#3a3340}
+.col[data-a="1"] i{height:45%}
+.col[data-a="0"] i{height:0}
+.col span{position:absolute;top:6px;left:0;right:0;text-align:center;font:600 12px var(--f-num);color:var(--muted)}
+.col.on[data-a="2"] i{background:var(--hot)}
+.col.on[data-a="1"] i{background:var(--accent)}
+.col.on[data-a="0"]{outline:2px solid var(--line)}
+.col.gapm i{opacity:.35}
+.dial{position:relative;flex-shrink:0;width:min(74vw,270px,32vh);aspect-ratio:1;max-width:100%;touch-action:none;cursor:grab}
+.dial .ring{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 35%,#3a4250,#1c2129 70%);box-shadow:inset 0 0 0 2px #444d5c,0 10px 30px -10px #000}
+.dial svg.ticks{position:absolute;inset:0;width:100%;height:100%}
+.dial .face{position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle at 50% 30%,#2e3440,#161a21);box-shadow:inset 0 0 0 2px var(--accent-soft)}
+.dial .arr{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:transparent;color:var(--muted);font:600 26px var(--f-num);cursor:pointer;z-index:2}
+.dial .arr.l{left:18%}.dial .arr.r{right:18%}
+.dplay{position:absolute;inset:34%;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;z-index:2;box-shadow:0 6px 24px -6px var(--accent)}
+.dplay svg{width:42%;height:42%}
+.mrow{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mbtn{border:0;background:var(--panel);border-radius:14px;padding:14px 8px;font:600 20px var(--f-num);cursor:pointer}
+.mbtn.tap{font-family:var(--f-display);font-weight:400;letter-spacing:.06em}
+.mbtn:active{background:var(--raise)}
+.mrow3{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sbtn{border:1px solid var(--line);background:transparent;border-radius:12px;padding:9px 6px;font:600 14px var(--f-body);cursor:pointer}
+.sbtn.on{border-color:var(--accent);color:var(--accent)}
+.lock .mlock{opacity:.35;pointer-events:none}
+/* trainer */
+.tr{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px}
+.chart{flex:1;min-height:180px;background:var(--card);border-radius:16px;padding:14px 10px 8px;display:flex}
+.chart svg{width:100%;height:100%;display:block}
+.stp{fill:var(--raise)}
+.stp.done{fill:var(--accent);opacity:.55}
+.stp.now{fill:var(--accent-soft)}
+.stpfill{fill:var(--accent)}
+.stl{font:600 10px var(--f-num);fill:var(--muted);text-anchor:middle}
+.stl.now{fill:var(--ink);font-size:12px}
+.preset{align-self:center;display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 14px;font:600 14px var(--f-body);color:var(--muted);cursor:pointer;margin-bottom:-4px}
+.preset svg{width:14px;height:14px}
+.ptop{position:relative;display:flex;justify-content:center}
+.histbtn{position:absolute;left:0;top:50%;transform:translateY(-50%);margin-top:-2px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
+.histbtn svg{width:18px;height:18px}
+.gpill{position:absolute;right:0;top:50%;transform:translateY(-50%);margin-top:-2px;padding:6px 10px;font-size:13px}
+.lock .gpill{pointer-events:auto}
+.lock .histbtn{pointer-events:none;opacity:.5}
+/* popups with a list: header and footer stay, only the list scrolls */
+.popcard.fixlist{display:flex;flex-direction:column;overflow:hidden}
+.popcard.fixlist #popBody{flex:1;min-height:0}
+.popcard.fixlist .plist{flex:1;min-height:0}
+.plist .songs{overflow-y:auto;min-height:0;flex:0 1 auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px}
+.plist>.row,.plist>.hint{flex-shrink:0}
+.hrun{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.hrh{display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:9px 12px;cursor:pointer;font:700 15px var(--f-body);text-align:start}
+.hrh i{font-style:normal;color:var(--muted)}
+.hrh small{font:500 12px var(--f-num);color:var(--muted)}
+.hrun.open .hrh{border-color:var(--accent)}
+.hbars{display:flex;flex-direction:column;gap:6px}
+.hb{position:relative;display:block;width:100%;border:2px solid transparent;background:var(--card);border-radius:10px;padding:2px 2px 0;cursor:pointer;flex-shrink:0}
+.hb{direction:ltr}
+.hb svg{display:block;width:100%;height:auto;direction:ltr}
+.hb .hn{position:absolute;top:2px;right:8px;font:600 10px var(--f-num);color:var(--muted)}
+.hb.unplayed{opacity:.62}
+.hb.sel{border-color:var(--accent);background:var(--accent-soft);opacity:1}
+.hb.sel::after{content:'✓';position:absolute;top:3px;left:6px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 12px/18px var(--f-body);text-align:center}
+.hmore{height:20px;flex-shrink:0}
+.hfoot{padding-top:10px;border-top:1px solid var(--line)}
+.hfoot{flex-wrap:nowrap;gap:6px}
+.lvl{display:flex;gap:22px;align-items:stretch;justify-content:center;--c:#6f8dff;--heat:0}
+.lvltrack{position:relative;width:64px;height:clamp(220px,38vh,320px);border-radius:32px;background:var(--bg);border:1px solid var(--line);cursor:pointer;touch-action:none;flex-shrink:0;
+  box-shadow:0 0 calc(var(--heat)*var(--heat)*46px) calc(var(--heat)*var(--heat)*6px) color-mix(in srgb,var(--c) 70%,transparent)}
+.lvlticks{position:absolute;inset:14px 0;display:flex;flex-direction:column;justify-content:space-between;align-items:center;pointer-events:none;z-index:2}
+.lvlticks i{width:14px;height:2px;border-radius:1px;background:rgba(255,255,255,.14)}
+.lvlfill{position:absolute;left:5px;right:5px;bottom:5px;border-radius:27px;min-height:54px;
+  background:linear-gradient(to top,#4f6bff 0%,#8a6cff 22%,#d35fd0 42%,#ff6a4d 62%,#ff3b1f 82%,#ffd04a 100%);background-size:100% calc(clamp(220px,38vh,320px) - 10px);background-position:bottom;transition:height .12s}
+.flame{position:absolute;left:50%;bottom:calc(100% - 26px);width:58px;height:70px;transform:translateX(-50%);pointer-events:none;opacity:calc((var(--heat) - .55)*2.4);filter:blur(.4px)}
+.flame b{position:absolute;left:50%;bottom:0;border-radius:50% 50% 45% 45%/62% 62% 38% 38%;transform-origin:50% 100%;animation:flick 1.1s ease-in-out infinite alternate}
+.flame b:nth-child(1){width:46px;height:62px;margin-left:-23px;background:radial-gradient(ellipse at 50% 78%,#ff9a2a 0%,#ff3b1f 55%,transparent 72%)}
+.flame b:nth-child(2){width:30px;height:44px;margin-left:-15px;background:radial-gradient(ellipse at 50% 80%,#ffe58a 0%,#ffae2a 55%,transparent 75%);animation-duration:.8s;animation-delay:-.3s}
+.flame b:nth-child(3){width:14px;height:24px;margin-left:-7px;background:radial-gradient(ellipse at 50% 80%,#fff 0%,#fff3b0 60%,transparent 80%);animation-duration:.6s}
+@keyframes flick{0%{transform:scale(1,1) rotate(-2deg)}50%{transform:scale(.92,1.08) rotate(2deg)}100%{transform:scale(1.05,.94) rotate(-1deg)}}
+.lvlthumb{position:absolute;left:50%;width:46px;height:46px;margin:0 0 -23px -23px;border-radius:50%;background:#fff;box-shadow:0 0 0 4px var(--c),0 4px 14px rgba(0,0,0,.5),0 0 calc(var(--heat)*28px) var(--c);z-index:3;pointer-events:none;transition:bottom .12s}
+.lvlinfo{display:flex;flex-direction:column;justify-content:space-between;align-items:center;min-width:120px}
+.lvlend{font:700 14px var(--f-body);color:var(--muted)}
+.lvlend.top{color:var(--c);text-shadow:0 0 calc(var(--heat)*14px) var(--c)}
+.lvlnum{display:flex;flex-direction:column;align-items:center;gap:2px}
+.lvlnum b{font:600 84px/1 var(--f-num);color:var(--c);text-shadow:0 0 calc(var(--heat)*var(--heat)*26px) var(--c);transition:color .15s}
+.lvlnum span{font:700 16px var(--f-body);color:var(--ink)}
+.lvl.hot .lvlnum b{animation:glow 1.2s ease-in-out infinite alternate}
+@keyframes glow{from{text-shadow:0 0 18px var(--c)}to{text-shadow:0 0 34px var(--c),0 0 60px #ffb02a}}
+@media (prefers-reduced-motion:reduce){.flame b,.lvl.hot .lvlnum b{animation:none}}
+.mseg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--bg);border-radius:14px;padding:4px;gap:4px}
+.mseg button{height:40px;border:0;border-radius:10px;background:transparent;color:var(--muted);font:700 15px var(--f-body);cursor:pointer}
+.mseg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.trk{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tk{background:var(--bg);border:1.5px solid var(--line);border-radius:16px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--muted);cursor:pointer}
+.tk b{font:700 16px var(--f-body);color:var(--muted)} .tk .ic{display:flex;gap:2px;direction:ltr} .tk svg{width:38px;height:auto}
+.tk[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)} .tk[aria-pressed="true"] b{color:var(--ink)}
+.inc{background:var(--bg);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted);line-height:1.55}
+.inc b{color:var(--ink)} .inc .new{color:#ff8a5a;font-weight:700}
+.gh{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+.gall{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:99px;padding:3px 12px;font:600 12px var(--f-body);cursor:pointer}
+.gg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.gc{background:var(--bg);border:1.5px solid var(--line);border-radius:14px;padding:6px 2px 5px;display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--ink);cursor:pointer}
+.gc svg{width:50px;height:auto} .gc small{font:600 11px var(--f-body);color:var(--muted);white-space:nowrap}
+.gc[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)} .gc[aria-pressed="true"] small{color:var(--accent)}
+.selcount{text-align:center;font-weight:700;color:var(--accent)}
+.mgh{display:flex;justify-content:space-between;align-items:center;font-weight:700;gap:8px} .mgh .t{cursor:pointer;flex:1;border:0;background:none;text-align:start;font:700 15px var(--f-body);color:var(--ink);padding:0} .mgh small{color:var(--muted);font-weight:500;font-size:12px}
+.mgb{display:flex;gap:6px}
+.pg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;direction:ltr}
+.pc{position:relative;background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:2px;opacity:.45;cursor:pointer;min-width:0}
+.pc.w2{grid-column:span 2} .pc.w4{grid-column:span 4}
+.pc svg{display:block;width:100%;height:auto;direction:ltr;pointer-events:none}
+.pc[aria-pressed="true"]{opacity:1;border-color:var(--accent);background:var(--accent-soft)}
+.pc[aria-pressed="true"]::after{content:'✓';position:absolute;top:2px;right:3px;width:14px;height:14px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 10px/14px var(--f-body);text-align:center}
+.accent{fill:none;stroke:var(--ink);stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round}
+.stk{font:700 10px var(--f-num);fill:var(--muted);text-anchor:middle}
+.stk.l{fill:#b9a3ff}
+.q b.on{color:var(--hot)}
+.dsteps{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;direction:ltr;background:var(--bg);border-radius:14px;padding:4px}
+.dsteps button{height:42px;border:0;border-radius:10px;background:transparent;color:var(--ink);font:600 17px var(--f-num);cursor:pointer}
+.dsteps button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.dsteps.auto button{opacity:.45;pointer-events:none}
+.dsteps.auto button[aria-pressed="true"]{opacity:1}
+.hfoot .done{flex:1;white-space:nowrap;padding:9px 10px}
+.hfoot .chip{white-space:nowrap;padding:8px 10px;font-size:14px}
+.preset.on{border-color:var(--accent);color:var(--accent)}
+.sbtn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lock .q,.lock .preset{pointer-events:none}
+.trsum{text-align:center;margin-top:-4px}
+.trinfo{background:var(--panel);border-radius:14px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-variant-numeric:tabular-nums}
+.trinfo b{font:600 17px var(--f-num)}
+.trinfo small{color:var(--muted);font-size:13px}
+/* transport + tabs */
+.transport{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;direction:ltr}
+.transport #newBtn{justify-self:end}
+.transport #filmBtn{justify-self:start}
+.live{display:none!important}
+.done:disabled,.chip:disabled{opacity:.4;cursor:default}
+.cfwrap{position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:20px}
+.cfcard{background:var(--panel);border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:18px;max-width:320px;width:100%;text-align:center;font-size:17px}
+.done.danger{background:#ff6b6b}
+/* tap play-along */
+.tapstats{display:flex;justify-content:center;gap:8px}
+.tchip{background:var(--panel);border-radius:12px;padding:5px 10px;text-align:center;font-size:11px;color:var(--muted);min-width:60px;flex:1;max-width:96px}
+.tchip b{display:block;font:600 18px var(--f-num);color:var(--ink);direction:ltr;white-space:nowrap}
+.tchip.g b{color:var(--good)}
+.pad{flex-shrink:0;height:clamp(84px,19vh,180px);border-radius:22px;background:var(--panel);border:2px solid var(--line);display:grid;place-items:center;color:var(--muted);font-weight:700;font-size:17px;touch-action:none;position:relative;overflow:hidden;cursor:pointer;transition:border-color .1s}
+.pad>div{pointer-events:none;text-align:center}
+.pad small{display:block;font-weight:400;font-size:12px;color:#5d6676}
+.pad.tg{border-color:var(--good)} .pad.ty{border-color:#f5b942} .pad.tx{border-color:#ff6b6b}
+.pad i,.calpad i{position:absolute;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;border:3px solid var(--accent);pointer-events:none;animation:rip .35s ease-out forwards}
+.pad i.tg{border-color:var(--good)} .pad i.ty{border-color:#f5b942} .pad i.tx{border-color:#ff6b6b}
+@keyframes rip{from{transform:scale(.3);opacity:1}to{transform:scale(1.6);opacity:0}}
+.n.tg .mg{fill:var(--good)!important} .n.ty .mg{fill:#f5b942!important} .n.tx .mg{fill:#ff6b6b!important}
+.calpad{position:relative;overflow:hidden;height:130px;border-radius:18px;background:var(--bg);border:2px dashed var(--accent);display:grid;place-items:center;font-weight:700;touch-action:none;text-align:center}
+.calpad small{display:block;font-weight:400;color:var(--muted)}
+.txt{font:500 16px var(--f-body);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;box-sizing:border-box;user-select:text;-webkit-user-select:text}
+/* filming mode */
+.film{position:fixed;inset:0;z-index:30;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+.fframe{position:relative;flex-shrink:0;container-type:inline-size;aspect-ratio:9/16;height:min(calc(100dvh - 84px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)),177.78vw);max-width:100vw;background:var(--bg);display:flex;flex-direction:column;gap:2cqw;padding:7cqw 4cqw 5cqw;box-sizing:border-box;overflow:hidden;color:var(--ink);font-family:var(--f-body)}
+.fhead{display:flex;flex-direction:column;align-items:center;gap:.5cqw}
+.fframe .logo{font-size:8cqw}
+.fhandle{font-size:3.8cqw;color:var(--muted);direction:ltr}
+.fchal{text-align:center;font:400 7.4cqw/1.25 var(--f-display);margin-top:3cqw;text-wrap:balance}
+.fround{display:flex;flex-direction:column;align-items:center;gap:.4cqw;margin-top:1cqw}
+.fround b{font:400 9cqw var(--f-display);color:var(--accent)}
+.fround small{font-size:3.8cqw;color:var(--muted)}
+.fscore{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:2cqw}
+.fscore .score{flex:1}
+.fprog{height:1.6cqw;background:var(--panel);border-radius:1cqw;overflow:hidden;flex-shrink:0}
+.fprog i{display:block;height:100%;width:0;background:var(--accent)}
+.ffoot{text-align:center;font-size:3.4cqw;color:#5d6676;direction:ltr}
+.fround{position:relative;align-self:stretch}
+.fcd{position:absolute;left:2cqw;top:50%;transform:translateY(-50%);width:17cqw;height:17cqw;border-radius:50%;display:grid;place-items:center;font:400 10cqw/1 var(--f-display);color:var(--accent-ink);background:var(--accent);pointer-events:none}
+.fend{position:absolute;inset:0;display:grid;place-items:center;background:rgba(12,14,18,.86);padding:10cqw;text-align:center;font:400 8cqw/1.3 var(--f-display);pointer-events:none}
+.fcam{position:absolute;left:3cqw;top:3cqw;width:25cqw;aspect-ratio:1;border-radius:50%;overflow:hidden;border:2px solid var(--accent);background:#1c2029;touch-action:none;cursor:grab}
+.fcam video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;pointer-events:none}
+.fcam.ghost{opacity:0}
+.fframe.half{padding-top:86cqw}
+.fframe.half .fcam{left:0!important;top:0!important;width:100%;height:84cqw;aspect-ratio:auto;border-radius:0;border:0}
+.fframe.half .fhead{position:absolute;top:3cqw;left:4cqw;right:4cqw;z-index:3;display:flex;justify-content:space-between;flex-direction:row;align-items:center}
+.fframe.half .fhead .logo,.fframe.half .fhandle{background:#fff;color:#0b0c0e;border-radius:99px;padding:1cqw 3cqw;font:800 3.6cqw Assistant,sans-serif}
+.fframe.half .fhead .logo span{color:#e8870c}
+.fframe.half .fchal{margin-top:0;font-size:5.4cqw}
+
+.frec{position:absolute;top:3cqw;right:4cqw;display:flex;gap:1.5cqw;align-items:center;background:#2a1215;color:#ff6b6b;font:700 3.4cqw var(--f-num);padding:1.2cqw 2.6cqw;border-radius:99px;direction:ltr}
+.frec i{width:2.4cqw;height:2.4cqw;border-radius:50%;background:#ff4d4d;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.2}}
+.fbar{height:84px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.fctl{display:flex;justify-content:center;gap:10px}
+.fstop{width:56px;height:56px;border-radius:50%;background:#2a1215;border:2px solid #ff6b6b;display:grid;place-items:center;cursor:pointer;padding:0}
+.fstop i{width:18px;height:18px;border-radius:3px;background:#ff6b6b}
+.fctl .chip{background:rgba(12,14,18,.85)}
+.fhint{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:31;background:rgba(12,14,18,.85);color:var(--muted);font-size:13px;padding:8px 14px;border-radius:99px;white-space:nowrap;pointer-events:none}
+.fres{position:fixed;inset:0;z-index:32;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px}
+.fres video{max-height:66vh;max-width:90vw;border-radius:14px;background:#000}
+.roundbtn{width:58px;height:58px;border-radius:50%;border:0;background:var(--panel);display:grid;place-items:center;cursor:pointer}
+.playbtn{width:76px;height:76px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 24px -6px var(--accent)}
+.playbtn svg,.roundbtn svg{width:30px;height:30px}
+.small{width:44px;height:44px}
+.small svg{width:20px;height:20px}
+.tabbar{display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);border-radius:16px;padding:6px}
+.tab{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;border-radius:10px}
+.tab svg{width:22px;height:22px}
+.tab[aria-selected="true"]{color:var(--accent)}
+.tab.off{opacity:.3;pointer-events:none}
+/* settings sheet + popup */
+.sheet{position:fixed;inset:0;z-index:20;background:var(--bg);transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px))}
+.sheet.open{transform:none}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;padding:14px 0;max-width:560px;width:100%;margin:0 auto}
+.sheet-head h2{font:400 24px var(--f-display);margin:0}
+.done{border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:16px;padding:9px 18px;border-radius:999px;cursor:pointer}
+.sheet-body{overflow-y:auto;flex:1;max-width:560px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding-bottom:30px;user-select:text}
+.sec{background:var(--panel);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:16px}
+.sec h3{margin:0;font:400 18px var(--f-display)}
+.pop{position:fixed;inset:0;z-index:30;background:#0008;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .18s}
+.pop.open{opacity:1;pointer-events:auto}
+.popcard{width:100%;max-width:560px;background:var(--panel);border-radius:20px 20px 0 0;padding:6px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));transform:translateY(30px);transition:transform .22s cubic-bezier(.2,.8,.2,1);max-height:80vh;overflow-y:auto;box-sizing:border-box}
+.pop.open .popcard{transform:none}
+.pophead{display:flex;justify-content:space-between;align-items:center;padding:10px 0 12px}
+.pophead h3{margin:0;font:400 20px var(--f-display)}
+#popBody{display:flex;flex-direction:column;gap:16px}
+.field{display:flex;flex-direction:column;gap:10px;min-width:0}
+.label{font-size:13px;font-weight:700;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:600 15px var(--f-body);min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.row input[type=range]{flex:1;min-width:120px}
+input[type=range]{accent-color:var(--accent)}
+.val{font:600 16px var(--f-num);color:var(--accent);min-width:2.5ch;text-align:center}
+.toggle{display:flex;align-items:center;justify-content:flex-start;gap:12px;cursor:pointer;font-weight:600}
+.toggle{min-height:40px}
+.toggle input{width:24px;height:24px;accent-color:var(--accent);flex-shrink:0}
+.num{width:64px;min-height:42px;font:600 17px var(--f-num);padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);text-align:center}
+select.num{width:76px}
+.text{flex:1;min-width:0;font:600 16px var(--f-body);padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.hint{color:var(--muted);font-size:13px}
+.calc{font:600 15px var(--f-num);color:var(--good)}
+.tempo-ed{display:flex;align-items:center;gap:14px;justify-content:center}
+.tempo-ed output{font:600 54px/1 var(--f-num);min-width:3ch;text-align:center}
+.tapbtn{border:1px solid var(--line);background:transparent;border-radius:12px;padding:10px 18px;font-weight:700;cursor:pointer}
+.kpwrap{position:fixed;inset:0;z-index:35;background:#000a;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s}
+.kpwrap.open{opacity:1;pointer-events:auto}
+.kpcard{width:100%;max-width:420px;background:var(--panel);border-radius:20px 20px 0 0;padding:4px 18px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;box-sizing:border-box}
+.kpshow{font:600 56px/1 var(--f-num);text-align:center;padding:6px 0;font-variant-numeric:tabular-nums;direction:ltr}
+.kpshow.bad{color:var(--hot)}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kp button{height:58px;border:1px solid var(--line);background:var(--bg);border-radius:14px;font:600 26px var(--f-num);cursor:pointer}
+.kp button:active{background:var(--raise)}
+.kp .ok{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.songs{display:flex;flex-direction:column;gap:6px}
+.song{display:flex;gap:6px}
+.song .load{flex:1;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;font:600 15px var(--f-body);text-align:start}
+.song .load small{font:500 13px var(--f-num);color:var(--muted);direction:ltr}
+.song .del{width:42px;border:1px solid var(--line);background:transparent;border-radius:12px;color:var(--muted);font-size:18px;cursor:pointer}
+.steppers{display:flex;justify-content:center;align-items:center;gap:8px}
+.stepper{display:flex;flex-direction:column;align-items:center;gap:4px}
+.stepper button{width:58px;height:40px;border:1px solid var(--line);background:var(--bg);border-radius:12px;font-size:16px;cursor:pointer;color:var(--muted)}
+.stepper button:active{background:var(--raise)}
+.tin{width:72px;font:600 38px/1.1 var(--f-num);text-align:center;background:transparent;border:0;border-bottom:2px solid var(--line);color:var(--ink);padding:2px 0;-moz-appearance:textfield}
+.tin::-webkit-inner-spin-button,.tin::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.tin:focus{outline:none;border-bottom-color:var(--accent)}
+.stepper small{font-size:12px;color:var(--muted)}
+.colon{font:600 40px var(--f-num);color:var(--muted);margin-bottom:18px}
+.wheels select{font:600 26px var(--f-num);padding:10px 8px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:88px;text-align:center}
+.clockbig{font:600 40px var(--f-num);text-align:center;font-variant-numeric:tabular-nums}
+.toast{position:fixed;left:50%;top:calc(18px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:40;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:12px 20px;border-radius:999px;box-shadow:0 8px 30px -8px #000}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+{{UICSS}}
+</style>
+
+<div class="screen" dir="rtl" id="screen">
+  <header class="top">
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v{{VER}}</span></div></div>
+    <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
+    <div class="hicons" dir="ltr">
+      <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
+      <span class="hgrp" id="genTop">
+        <button class="hic" id="genPresetBtn" data-pop="genPresets" aria-label="הגדרות שמורות"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg><span id="genPresetT" hidden></span></button>
+        <button class="hic" id="histBtn" data-pop="history" aria-label="היסטוריה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 7v5l3 2"/></svg></button>
+        <button class="hic hpill dim" id="clockPillG" data-pop="clock" aria-label="שעון תרגול"><span id="clockPillGT">0:00</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></button>
+      </span>
+    </div>
+  </header>
+
+  <!-- reading -->
+  <div class="tapstats" id="tapStats" hidden><div class="tchip g"><b id="tAcc">—</b>דיוק</div><div class="tchip tend"><span class="tm" id="tTend"><i></i></span><span id="tOffL">נטייה</span><b id="tOff" hidden>—</b></div><div class="tchip"><b id="tStreak">0</b>רצף 🔥</div><div class="tchip"><b id="tBest">0</b>שיא</div></div>
+  <div class="score" id="score" dir="ltr"></div>
+  <div class="pad" id="pad" hidden><div>תופף כאן<small>כל המשטח רגיש · אפשר עם כמה אצבעות</small></div></div>
+  <div class="live" id="live" hidden><div><b id="liveMain">מתחיל…</b></div><small id="liveSub"></small></div>
+
+  <!-- metronome -->
+  <section class="met" id="metView" hidden>
+    <div class="cols" id="cols"></div>
+    <div class="dialwrap">
+      <div class="dial" id="dial" aria-label="גלגל טמפו" dir="ltr">
+        <svg class="ticks" id="dialTicks" viewBox="0 0 100 100"></svg>
+        <div class="dc"><b id="mBpm" role="button" tabindex="0" aria-label="הקלד טמפו">80</b><i id="mName">ANDANTE</i></div>
+      </div>
+      <span class="msong" id="mSong" hidden></span>
+    </div>
+    <button class="mclock dim" id="clockPill" data-pop="clock"><svg class="drain" preserveAspectRatio="none" viewBox="0 0 200 56"><rect class="dr0" x="1.5" y="1.5" width="197" height="53" rx="26.5" pathLength="100"/><rect class="dr1" id="clockDrain" x="1.5" y="1.5" width="197" height="53" rx="26.5" pathLength="100"/></svg><b id="clockPillT">0:00</b><small id="clockPillL">⏱ שעון</small></button>
+    <div class="gapb" id="gapBadge" hidden></div>
+  </section>
+
+  <!-- trainer -->
+  <section class="tr" id="trView" hidden>
+    <div class="trhead"><b id="trBig">80</b><small id="trStepL">BPM</small><div class="trnext" id="trSub"></div></div>
+    <div class="chart" id="trChartBox"><svg id="trChart" viewBox="0 0 340 200"></svg></div>
+    <div class="trtime"><span id="trEl"></span><span id="trSum"></span></div>
+    <div class="trinfo" id="trInfo" hidden><b id="trMain"></b></div>
+  </section>
+
+  <div class="deck" id="deck">
+    <div class="tiles" id="quickGen">
+      <button class="tile" data-pop="meter" data-drag="meter"><small>משקל</small><span class="viz" id="vMeter"></span><b id="qMeter"></b></button>
+      <button class="tile" data-pop="bars" data-drag="bars"><small>תיבות</small><span class="viz" id="vBars"></span><b id="qBars">4</b></button>
+      <button class="tile" data-pop="level" data-drag="level"><small>מורכבות</small><span class="viz" id="vLevel"></span><b id="qLevel">5</b></button>
+      <button class="tile" id="dynTile"><small>דינמיקה</small><span class="viz" id="vDyn"></span><b id="qDyn">כבוי</b></button>
+    </div>
+    <div class="tiles" id="quickMet" hidden>
+      <button class="tile" data-pop="mbeats" data-drag="mbeats"><small>משקל</small><span class="viz" id="vMBeats"></span><b id="mMeterBtn"></b></button>
+      <button class="tile" data-pop="msub"><small>חלוקה</small><span class="viz" id="vMSub"></span><b id="qMSub"></b></button>
+      <button class="tile" id="gapBtn" data-pop="gap"><small>הפסקות</small><span class="viz" id="vGap"></span><b id="qGap"></b></button>
+      <button class="tile" data-pop="sound"><small>צליל</small><span class="viz" id="vSnd"></span><b id="qSnd"></b></button>
+    </div>
+    <div class="tiles" id="quickTr" hidden>
+      <button class="tile" data-pop="trSet"><small>טמפו</small><span class="viz" id="vTrT"></span><b id="qtRange"></b></button>
+      <button class="tile" data-pop="trSet"><small>קפיצה</small><span class="viz">↗</span><b id="qtStep">+5</b></button>
+      <button class="tile" data-pop="trSet"><small>מתי</small><span class="viz" id="vTrW"></span><b id="qtWhen">4</b></button>
+      <button class="tile" data-pop="mbeats"><small>משקל</small><span class="viz" id="vTrM"></span><b id="qtMeter">4/4</b></button>
+    </div>
+    <div class="ruler" id="ruler" dir="ltr"><div class="rn" id="rulerNum"><b id="qBpm">80</b><small>BPM</small><i id="qTempo">ANDANTE</i></div><div class="tks" id="rulerTks"></div></div>
+    <div class="transport" id="transport" dir="ltr">
+      <button class="sq" id="newBtn" aria-label="מקצב חדש"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button>
+      <button class="sq txt" id="mTap" aria-label="הקש טמפו">הקש</button>
+      <button class="big" id="play" aria-label="נגן"><span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg><span id="playL">נגן</span></button>
+      <button class="sq" id="filmBtn" aria-label="מצב צילום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3"/></svg></button>
+      <button class="sq txt" id="songBtn" data-pop="songs" aria-label="שירים"><span>♫</span><small>שירים</small></button>
+      <button class="sq txt" id="trPresetBtn" data-pop="trPresets" aria-label="תרגילים שמורים"><span>★</span><small id="trPresetT">תרגילים</small></button>
+    </div>
+    <div class="kbhint" dir="rtl"><kbd>רווח</kbd> נגן/עצור · <kbd>N</kbd> חדש · <kbd>↑↓</kbd> טמפו · <kbd>1-4</kbd> מסכים</div>
+    <nav class="tabbar" id="tabbar">
+      <button class="tab" id="tabGen" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 17V5l11-2v12"/><circle cx="6.5" cy="17" r="2.5"/><circle cx="17.5" cy="15" r="2.5"/></svg>קריאה</button>
+      <button class="tab" id="tabMet" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l4 18H5z"/><path d="M12 15l5-9"/></svg>מטרונום</button>
+      <button class="tab" id="tabTr" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h4v-4h4v-4h4V8h4V4"/></svg>מאמן</button>
+      <button class="tab" id="tabSet" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>הגדרות</button>
+    </nav>
+  </div>
+</div>
+
+<div class="pop" id="pop" aria-hidden="true"><div class="popcard" dir="rtl"><div class="pophead"><h3 id="popTitle"></h3><button class="done" id="popClose">סיום</button></div><div id="popBody"></div></div></div>
+<div class="toast" id="toast" hidden></div>
+<div class="audgate" id="audGate" hidden dir="rtl">🔊 לחץ פעם אחת על המסך כדי שהשלט מהטלפון יוכל לנגן</div>
+<div class="kpwrap" id="kpWrap" aria-hidden="true"><div class="kpcard" dir="rtl">
+  <div class="pophead"><h3 id="kpTitle">טמפו</h3><button class="done" id="kpCancel">ביטול</button></div>
+  <div class="kpshow" id="kpShow">80</div>
+  <div class="kp" id="kp" dir="ltr"><button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button><button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button><button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button><button data-k="del" aria-label="מחק">⌫</button><button data-k="0">0</button><button data-k="ok" class="ok" aria-label="אישור">✓</button></div>
+  <div class="hint" id="kpHint" style="text-align:center"></div>
+</div></div>
+
+<div class="cfwrap" id="cfWrap" hidden><div class="cfcard" dir="rtl"><div class="cfico">🗑</div><b id="cfText"></b><label class="cfask"><input type="checkbox" id="cfNoAsk">אל תשאל אותי שוב</label><div class="cfbtn"><button class="done danger" id="cfYes">מחק</button><button class="chip" id="cfNo">ביטול</button></div></div></div>
+<div class="fset" id="fSet" dir="rtl" hidden>
+  <div class="fs-hd"><b>הגדרות צילום 🎬</b><button class="fs-x" id="fsX" aria-label="סגור">✕</button></div>
+  <div class="fs-prev" id="fsPrev"><video id="fsVid" playsinline muted autoplay></video><div class="fs-nocam" id="fsNoCam">🎥</div>
+    <span class="fs-pill l" id="fsHandle" dir="ltr"></span><span class="fs-pill r" dir="ltr">Chart<b>Ready</b></span>
+    <div class="fs-band"><div class="fs-t" id="fsTitle"></div><div class="fs-l" id="fsLvl"></div><div class="fs-bars"><i></i><i></i><i></i></div></div>
+    <span class="fs-lay" id="fsLayT"></span></div>
+  <div class="fs-tiles" id="fsTiles"></div>
+  <button class="fs-sync" id="fsSync">🎧 סנכרון אוזניות <span class="v" id="fsSyncV"></span><span class="a" id="fsSyncA">סנכרן</span></button>
+  <button class="fs-go" id="fsGo">המשך לצילום ›</button>
+  <div class="fs-pop" id="fsPop" hidden><div class="fs-pc"><div class="fs-hd"><b id="fsPopT"></b><button class="fs-x" id="fsPopX">✕</button></div><div id="fsPopB" class="fs-pb"></div></div></div>
+</div>
+<div class="fsync" id="fSyncScr" dir="rtl" hidden>
+  <div class="fs-hd"><b>סנכרון אוזניות 🎧</b><button class="fs-x" id="syX" aria-label="סגור">✕</button></div>
+  <div class="sy-mid" id="syIntro"><div class="sy-big">הכה יחד עם הקליקים</div><div class="sy-mut">על התוף, הפד או הברך,<br>בדיוק כמו שאתה שומע באוזניות</div><div class="sy-mut sm">8 קליקים · 60 BPM בשמיניות</div><button class="fs-go" id="syStart">▶ התחל</button></div>
+  <div class="sy-mid" id="syRun" hidden><div class="sy-big">הכה יחד עם הקליקים</div><div class="sy-pulse" id="syPulse">8</div><div class="sy-dots" id="syDots"></div></div>
+  <div class="sy-mid" id="syRes" hidden><div class="sy-ok" id="syIcon">✓</div><div class="sy-big" id="syHead">האוזניות מאחרות ב־</div><div class="sy-num" id="syNum"></div><div class="sy-mut" id="syMsg"></div><div class="sy-hits" id="syHits"></div><div class="sy-mut sm" id="syStat"></div>
+    <div class="sy-btns"><button class="chip" id="syAgain">↻ שוב</button><button class="fs-go" id="syGo">המשך לצילום ›</button></div></div>
+</div>
+<div class="film" id="film" dir="rtl" hidden>
+  <div class="fframe" id="fFrame">
+    <div class="fhead"><div class="logo">Chart<span>Ready</span></div><div class="fhandle" id="fHandle"></div></div>
+    <div class="fchal" id="fChal"></div>
+    <div class="fround"><b id="fRoundMain"></b><small id="fRoundSub"></small><div class="fcd" id="fCd" hidden></div></div>
+    <div class="fscore" id="fScoreSlot"></div>
+    <div class="fprog"><i id="fProg"></i></div>
+    <div class="ffoot">ChartReady · מאמן הקריאה לנגנים</div>
+    <div class="fcam" id="fCam" hidden><video id="fVid" playsinline muted autoplay></video></div>
+    <div class="fend" id="fEnd" hidden><b id="fEndT"></b></div>
+    <div class="frec" id="fRec" data-norec hidden><i></i><span id="fRecT">REC 0:00</span></div>
+  </div>
+  <div class="fbar"><div class="fctl" id="fCtl"><button class="chip" id="fExit">יציאה</button><button class="done" id="fGo">▶ התחל</button></div><button class="fstop" id="fStop" hidden aria-label="עצור"><i></i></button></div>
+  <div class="fhint" id="fHint" hidden>לעצירה: נגיעה בשתי אצבעות או לחיצה ארוכה</div>
+  <div class="fres" id="fRes" hidden><video id="fResVid" controls playsinline></video><div class="row" style="justify-content:center"><button class="done" id="fSave">שמור / שתף</button><button class="chip" id="fResClose">סגור</button></div><div class="hint" id="fResHint" style="text-align:center"></div></div>
+</div>
+<div class="fed" id="fEd" dir="rtl" hidden>
+  <div class="fedh"><button class="done" id="edSave">שמור ✓</button><b id="edTitle">עריכה</b><button class="xbtn" id="edX" aria-label="סגור">✕</button></div>
+  <div class="fedstage" id="edStage"><canvas id="edCv" width="540" height="960"></canvas><div class="edhint" id="edHint">גרור · צבוט לשינוי גודל</div><button class="edplay" id="edPlay" aria-label="נגן">▶</button></div>
+  <div class="edtl" id="edTl" dir="ltr"><div class="edtrk" id="edTrk"></div><i class="edcur" id="edCur"></i></div>
+  <div class="edpanel" id="edPanel"></div>
+  <div class="edtools" id="edTools"><button data-tool="cam" aria-pressed="true"><span>🎥</span><small>מצלמה</small></button><button data-tool="lay"><span>▦</span><small>פריסה</small></button><button data-tool="txt"><span>Aa</span><small>טקסט</small></button><button data-tool="trim"><span>✂</span><small>חיתוך</small></button><button data-tool="sync"><span>🎧</span><small>סנכרון</small></button></div>
+  <video id="edBase" playsinline hidden></video><video id="edCam" playsinline muted hidden></video>
+  <div class="edexp" id="edExp" hidden><div class="fedh"><span></span><b>מייצר סרטון</b><button class="xbtn" id="edExpX" aria-label="ביטול">✕</button></div><div class="cal"><div class="ring" id="edRing"><div id="edPct">0%</div></div><div class="bg2" id="edLeft">רגע…</div><div class="mut">משאירים את המסך פתוח. הסרטון נשמר עם הפריסה החדשה</div></div><button class="chip" id="edExpCancel" style="height:50px;justify-content:center">ביטול</button></div>
+</div>
+
+<div class="sheet" id="sheet" dir="rtl" aria-hidden="true">
+  <div class="sheet-head"><h2>הגדרות</h2><button class="done" id="closeSheet">סיום</button></div>
+  <div class="stabs" id="stabs"><button data-st="read" aria-pressed="true">קריאה</button><button data-st="snd">צלילים</button><button data-st="view">תצוגה</button><button data-st="about">אודות</button></div>
+  <div class="sheet-body" id="sheetBody">
+    <section class="sec" data-st="read">
+      <div class="field"><div class="srow"><span class="sic">✍</span><div><b>כתיבה מקצועית</b><small>איך נכתבות הפסקות בתוך פעמה</small></div></div>
+        <div class="seg3" id="restSeg"><button data-v="0">מקצוען</button><button data-v="50">מעורב</button><button data-v="100">חובבן</button></div></div>
+      <label class="toggle"><input type="checkbox" id="ties"><span><b>חיבורים (קשתות)</b><small>תווים מחוברים בין פעמות</small></span></label>
+      <div class="field"><div class="srow"><span class="sic">🔁</span><div><b>מקצב חדש אחרי</b></div></div><div class="chips" id="repeats"></div></div>
+      <label class="toggle"><input type="checkbox" id="tapOn"><span><b>ניגון יחד</b><small>מתופפים על המסך ומקבלים ניקוד</small></span></label>
+      <div class="srow act" id="tapCalBtn" role="button" tabindex="0"><span class="sic">🎯</span><div><b>כיול הקשה</b><small id="tapCalOut">מומלץ פעם אחת לכל טלפון</small></div><span class="go">כייל ‹</span></div>
+    </section>
+    <section class="sec" data-st="snd" hidden>
+      <label class="toggle"><input type="checkbox" id="clickOn"><span><b>קליק</b></span></label>
+      <label class="toggle"><input type="checkbox" id="noteSound"><span><b>לנגן את המקצב</b><small>שומעים את התווים בזמן הקריאה</small></span></label>
+      <label class="toggle"><input type="checkbox" id="countIn"><span><b>תיבת ספירה לפני ההתחלה</b></span></label>
+      <label class="toggle"><input type="checkbox" id="uiSnd"><span><b>צלילי ממשק</b></span></label>
+      <div class="field"><div class="label">צליל הקליק</div><div class="scards" id="clickSnd"></div></div>
+      <label class="toggle"><input type="checkbox" id="askDelOn"><span><b>לשאול לפני מחיקה</b></span></label>
+    </section>
+    <section class="sec" data-st="view" hidden>
+      <label class="toggle"><input type="checkbox" id="showCount"><span class="cic" dir="ltr">1 e &amp;</span><span><b>ספירה מתחת לתווים</b></span></label>
+      <div class="field"><div class="label">ספירת סקסטולות</div><div class="chips" id="sextCount"></div></div>
+    </section>
+    <section class="sec" data-st="about" hidden>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה {{VER}}</div></div>
+      <button class="remlock" id="remLock">סודי 🔒</button>
+      <div id="remPanel" hidden>
+        <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
+        <div id="fmSec" class="field">
+          <div class="label">מה מצלמים</div>
+          <div class="pnl">
+            <label class="toggle"><input type="checkbox" id="fmRec"><span><b>הקלטה בתוך האפליקציה</b><small>אחרי הצילום אפשר לערוך מיקום מצלמה, טקסט וחיתוך</small></span></label>
+            <label class="toggle" id="fmCamRow"><input type="checkbox" id="fmCam"><span><b>מצלמה</b></span></label>
+            <label class="toggle" id="fmMicRow"><input type="checkbox" id="fmMic"><span><b>מיקרופון</b></span></label>
+            <label class="toggle"><input type="checkbox" id="fmClean"><span><b>מסך נקי (בלי כפתורים)</b></span></label>
+            <label class="toggle"><input type="checkbox" id="fmCount"><span><b>ספירה לפני כל סבב</b></span></label>
+          </div>
+          <div class="hint" id="fmRecHint"></div>
+          <div class="label">מבנה הסרטון</div>
+          <div class="pnl">
+            <div class="seg3" id="fmMode"></div>
+            <div class="hint" id="fmModeHint"></div>
+            <div class="srow" id="fmRoundsF"><div><b>סבבים</b></div><div class="cnt3" dir="ltr"><button data-fm="fmRounds" data-d="-1">−</button><b id="fmRoundsV">5</b><button data-fm="fmRounds" data-d="1">+</button></div></div>
+            <div class="srow" id="fmStepF"><div><b>קפיצת טמפו</b></div><div class="cnt3" dir="ltr"><button data-fm="fmStep" data-d="-5">−</button><b id="fmStepV">+10</b><button data-fm="fmStep" data-d="5">+</button></div></div>
+          </div>
+          <div class="label">ברירות מחדל לטקסט</div>
+          <div class="pnl">
+            <div class="field"><small class="hint">כותרת ({BPM} מתחלף בטמפו)</small><input class="txt" id="fmTitle" maxlength="70"></div>
+            <div class="field"><small class="hint">שם משתמש</small><input class="txt" id="fmHandle" maxlength="30" dir="ltr"></div>
+            <div class="field"><small class="hint">טקסט סיום</small><input class="txt" id="fmEnd" maxlength="70"></div>
+          </div>
+          <div class="chips" id="fmRounds" hidden></div>
+        </div>
+        <div id="remBox" class="field" hidden>
+          <div class="remstate"><i id="remDot"></i><span id="remStatus">המכשיר הזה עוד לא מחובר.</span></div>
+          <div id="remHost" class="field">
+            <div id="remPairBox" class="field" hidden><div class="mut">סורקים מטלפון אחר כדי לשלוט באפליקציה מרחוק: נגן, עצור, חדש</div><div class="qr" id="remQR"></div><div class="clockbig" id="remCode"></div><div class="url" id="remUrl"></div><div class="hint" style="text-align:center">הקוד תקף ל־10 דקות.</div></div>
+            <div class="row"><button class="done" id="remPair">חבר את הטלפון</button><button class="chip" id="remUnpair" hidden>נתק</button></div>
+            <button class="chip" id="remEnterCode" style="align-self:flex-start">זה הטלפון: יש לי קוד מהמחשב</button>
+          </div>
+          <div id="remPhone" class="field" hidden><button class="chip" id="remPhoneUnpair" style="align-self:flex-start">נתק מהמחשב</button></div>
+        </div>
+        <button class="chip" id="remLockAgain" style="align-self:center">סגור</button>
+      </div>
+    </section>
+
+    <div id="stash" hidden>
+      <div class="field" id="fVol"><div class="mixer" id="mixer"></div><div class="hint" style="text-align:center">גוררים את הכפתור למעלה ולמטה · נגיעה ב־🔊 משתיקה ערוץ</div><div class="hint" id="outPhoneHint" hidden>העוצמה כאן שולטת בצליל של המחשב.</div></div>
+      <div class="field" id="fTempo">
+        <div class="tpshow" id="tpShow" dir="ltr">80</div>
+        <div class="tpname"><span id="bpmUnit">BPM</span> · <em id="tpName">Andante</em> · טווח <bdi dir="ltr">1–400</bdi></div>
+        <div id="tpKeys" class="field">
+          <div class="pm" dir="ltr"><button id="bpmDown">−5</button><button class="tapk" id="tpTapBtn">הקש 👆</button><button id="bpmUp">+5</button></div>
+          <div class="kp" id="tpKp" dir="ltr"><button data-t="1">1</button><button data-t="2">2</button><button data-t="3">3</button><button data-t="4">4</button><button data-t="5">5</button><button data-t="6">6</button><button data-t="7">7</button><button data-t="8">8</button><button data-t="9">9</button><button data-t="del" aria-label="מחק">⌫</button><button data-t="0">0</button><button data-t="ok" class="ok" aria-label="אישור">✓</button></div>
+        </div>
+        <div id="tpTap" class="field" hidden>
+          <div class="tdots" id="tpDots"></div>
+          <button class="tappad" id="tap"><span>👆</span><b>הקש כאן בקצב</b><small>ממוצע של 5 הקשות אחרונות</small></button>
+          <div class="pm" dir="ltr"><button id="tpDn2">−5</button><button id="tpKbd">🔢 מקלדת</button><button id="tpUp2">+5</button></div>
+        </div>
+      </div>
+      <div class="field" id="fMeter">
+        <div class="wl">פעמות בתיבה</div><div class="wheel" id="wNum" dir="ltr"></div>
+        <div class="wl">ערך הפעמה</div><div class="wheel" id="wDen" dir="ltr"></div>
+        <div class="label">משקלים נפוצים</div><div class="chips cm" id="meterPresets" dir="ltr"></div>
+        <input type="number" id="num" min="1" max="19" hidden><select id="den" hidden><option value="4">4</option><option value="8">8</option></select>
+        <div class="hint">במשקלים של 8 התווים מקובצים לפי 3 או 2+2+3, וה־BPM נספר לפי שמינית.</div>
+      </div>
+      <div class="field" id="fBars"><div class="wheel" id="wBars" dir="ltr"></div><div class="bsq" id="bSq" dir="ltr"></div><input type="number" id="bars" min="1" max="32" hidden><div id="barPresets" hidden></div></div>
+      <div class="field" id="fStyle"><div class="chips" id="presets"></div><div class="chips" id="grids"><button class="chip" data-g="1">רבעים</button><button class="chip" data-g="2">שמיניות</button><button class="chip" data-g="4">שש־עשריות</button><button class="chip" data-g="3">טריולות</button><button class="chip" data-g="6">סקסטולות</button><button class="chip" data-g="L">טריולות ארוכות</button></div></div>
+      <div class="field" id="fLevel">
+        <div class="mseg" id="modeSeg"><button data-m="path">מסלול</button><button data-m="free">חופשי</button><button data-m="manual">ידני</button></div>
+        <input type="range" id="level" min="1" max="10" step="1" hidden>
+        <div class="lvl" id="lvlBox">
+          <div class="lvltrack" id="lvlTrack" role="slider" tabindex="0" aria-label="מורכבות" aria-valuemin="1" aria-valuemax="10">
+            <div class="lvlticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="lvlfill" id="lvlFill"><div class="flame"><b></b><b></b><b></b></div></div>
+            <div class="lvlthumb" id="lvlThumb"></div>
+          </div>
+          <div class="lvlinfo">
+            <div class="lvlend top">🔥 מקצוען</div>
+            <div class="lvlnum"><b id="levelOut">5</b><span id="levelName"></span></div>
+            <div class="lvlend">מתחיל</div>
+          </div>
+        </div>
+        <div id="pathPart" class="field">
+          <div class="trk"><button class="tk" id="trkD"><b>מרובעים</b><span class="ic" id="trkDIc"></span></button><button class="tk" id="trkT"><b>משולשים</b><span class="ic" id="trkTIc"></span></button></div>
+          <div class="inc" id="pathInc"></div>
+        </div>
+        <div id="freePart" class="field">
+          <div class="gh"><span>מרובעים</span><button class="gall" data-cat="d">הכל</button></div><div class="gg" id="freeD"></div>
+          <div class="gh"><span>משולשים</span><button class="gall" data-cat="t">הכל</button></div><div class="gg" id="freeT"></div>
+          <div class="hint">המורכבות נמתחת על מה שבחרת: 1 הכי קל, 10 הכי קשה.</div>
+        </div>
+        <div id="manPart" class="field"><div class="selcount" id="manCount"></div><div id="manGroups" class="field"></div></div>
+      </div>
+      <div class="field" id="fMBeats"><div class="wl">פעמות בתיבה</div><div class="wheel" id="wMB" dir="ltr"></div><div class="hint" style="text-align:center">נגיעה בעמודה במסך המטרונום מחליפה מודגש / רגיל / שקט</div><div id="mBeatPresets" hidden></div><input type="number" id="mBeats" min="1" max="19" hidden></div>
+      <div class="field" id="fMSub"><div class="subg" id="mSub"></div></div>
+      <div class="field" id="fSound"><div class="scards" id="clickSnd2"></div></div>
+      <div class="field" id="fGap">
+        <label class="toggle"><input type="checkbox" id="gapOn"><span><b>קליק עם הפסקות</b><small>הקליק נעלם לכמה תיבות ואתה ממשיך לבד</small></span></label>
+        <div id="gapBody" class="field">
+          <div class="srow"><div><b>תיבות עם קליק</b></div><div class="cnt3" dir="ltr"><button data-gp="gapPlay" data-d="-1">−</button><b id="gapPlayV">2</b><button data-gp="gapPlay" data-d="1">+</button></div></div>
+          <div class="srow"><div><b>תיבות שקטות</b></div><div class="cnt3" dir="ltr"><button data-gp="gapMute" data-d="-1">−</button><b id="gapMuteV">2</b><button data-gp="gapMute" data-d="1">+</button></div></div>
+          <div class="gcyc" id="gapCyc"></div><div class="gstrip" id="gapStrip" dir="ltr"></div><div class="glegend" id="gapLeg"></div>
+        </div>
+        <input type="number" id="gapPlay" min="1" max="16" hidden><input type="number" id="gapMute" min="1" max="16" hidden>
+      </div>
+      <div class="field" id="fClock">
+        <div class="seg2" id="clockMode"></div>
+        <div id="timerPick" class="field"><button class="tval" id="timerVal" dir="ltr">5:00</button><div class="hint" style="text-align:center">נגיעה במספר פותחת מקלדת</div><div class="chips sm" id="tPresets" style="justify-content:center"></div></div>
+        <div class="clockbig" id="clockShow">0:00</div>
+        <div class="row" style="justify-content:center"><button class="done" id="clockGo">הפעל</button><button class="chip" id="clockReset">איפוס</button></div>
+        <label class="toggle"><input type="checkbox" id="clkClick"><span><b>מפעיל את הקליק</b></span></label>
+        <label class="toggle" id="clkStopRow"><input type="checkbox" id="clkStopClick"><span><b>בסיום הטיימר לעצור את הקליק</b></span></label>
+      </div>
+      <div class="field plist" id="fSongs">
+        <div class="srch"><input class="text" id="songFind" placeholder="🔍 חיפוש שיר"></div>
+        <div class="songs" id="songList"></div>
+        <div class="row pfoot"><input class="text" id="songName" placeholder="שם השיר" maxlength="40"><button class="done" id="songSave">שמור</button></div>
+      </div>
+      <div class="field" id="fDyn">
+        <label class="toggle"><input type="checkbox" id="dynOn"><span><b>תרגול דינמיקה (אקצנטים)</b></span></label>
+        <div id="dynBody" class="field">
+          <label class="toggle"><input type="checkbox" id="stickOn"><span><b>הצג סטיקינג (R / L)</b></span></label>
+          <label class="toggle"><input type="checkbox" id="dynAuto"><span><b>השלב עולה עם המורכבות</b></span></label>
+          <div class="field" id="dynPick"><div class="label">שלב אקצנטים: <b id="dynOut" style="color:var(--accent)">1</b> · <span id="dynName"></span></div><div class="dsteps" id="dynSteps"></div></div>
+          <div class="field"><div class="label">מקסימום דגשים ברצף</div><div class="dsteps d8" id="dynMax"></div></div>
+          <div class="hint">סטיקינג: סינגלים לפי הערך הקטן ביותר בכל פעמה. בטריולה היד הבאה עוברת לפעמה הבאה, ורבעים תמיד ביד ימין.</div>
+        </div>
+      </div>
+      <div class="field plist" id="fHistory">
+        <div class="songs" id="histList"></div>
+        <div class="row hfoot pfoot"><button class="done" id="histLoad" disabled>טען לתרגול</button><button class="chip" id="histUnsel" disabled>נקה סימון</button><button class="chip" id="histClear" style="color:#ff6b6b">נקה היסטוריה</button></div>
+      </div>
+      <div class="field plist" id="fGenPresets">
+        <div class="songs" id="genPresetList"></div>
+        <div class="row pfoot"><input class="text" id="genPresetName" placeholder="שם ההגדרה" maxlength="40"><button class="done" id="genPresetSave">שמור</button></div>
+      </div>
+      <div class="field plist" id="fTrPresets">
+        <div class="songs" id="trPresetList"></div>
+        <div class="row pfoot"><input class="text" id="trPresetName" placeholder="שם התרגיל" maxlength="40"><button class="done" id="trPresetSave">שמור</button></div>
+      </div>
+      <div class="field" id="fTrSet">
+        <div class="trprev"><svg id="trPrev" viewBox="0 0 300 70" preserveAspectRatio="none"></svg></div>
+        <div class="sum" id="trTotal"></div>
+        <div class="sec2"><div class="label">טמפו</div>
+          <div class="rng2" dir="ltr"><button class="rbox" id="trStartB"><b id="trStartV">80</b><small>התחלה</small></button><span class="arr" id="trArr">→</span><button class="rbox on" id="trMaxB"><b id="trMaxV">140</b><small>יעד</small></button></div>
+          <div class="hint" style="text-align:center">יעד נמוך מההתחלה = תרגיל יורד</div>
+        </div>
+        <div class="sec2"><div class="label">קפיצה בכל שלב</div>
+          <div class="every"><div class="v" dir="ltr"><button class="ab" data-ts="-1">−</button><b id="trStepV">+5</b><button class="ab" data-ts="1">+</button></div><span>BPM</span></div>
+          <div class="chips sm" id="trStepChips" dir="ltr"></div>
+        </div>
+        <div class="sec2"><div class="label">מתי לקפוץ</div>
+          <div class="seg2" id="trMode"></div>
+          <div id="trBarsRow" class="field"><div class="every"><span>אחרי</span><div class="v" dir="ltr"><button class="ab" data-tb="-1">−</button><b id="trBarsV">4</b><button class="ab" data-tb="1">+</button></div><span id="trBarsU">תיבות</span></div><div class="chips sm" id="trBarsChips" dir="ltr"></div></div>
+          <div id="trTimeRow" class="field"><div class="every"><span>אחרי</span><div class="v" dir="ltr"><button class="ab" data-tt2="-5">−</button><b id="trSecV" role="button">0:30</b><button class="ab" data-tt2="5">+</button></div><span id="trSecU">דקות</span></div><div class="chips sm" id="trSecChips"></div></div>
+        </div>
+        <input type="number" id="trStart" min="1" max="400" hidden><input type="number" id="trMax" min="1" max="400" hidden><input type="number" id="trStep" min="1" max="100" hidden><input type="number" id="trBars" min="1" max="128" hidden><input type="number" id="trMin" hidden><input type="number" id="trSecs" hidden>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="calscr" id="calScr" dir="rtl" hidden>
+  <div class="fhd2"><span>כיול הקשה</span><button class="xbtn" id="calX" aria-label="סגור">✕</button></div>
+  <div class="calrun" id="calRun">
+    <div class="bg2">הקש יחד עם הקליק</div><div class="mut">4 קליקים להקשבה, ואז 8 הקשות. ככה נדע אם הטלפון שלך מאחר או מקדים</div>
+    <div class="cdots" id="calDots"></div>
+    <div class="calpad" id="calPad">👆 הקש כאן</div><div class="mut" dir="ltr">♩ 100 BPM</div>
+  </div>
+  <div class="calres" id="calRes" hidden><div class="okmark">✓</div><div class="bg2">הכיול הושלם</div><div class="mut">מעכשיו ההקשות שלך יימדדו בדיוק לפי הטלפון הזה</div></div>
+  <div class="calbad" id="calBad" hidden><div class="okmark" style="color:var(--hot)">↻</div><div class="bg2">לא הצלחנו לכייל</div><div class="mut" id="calBadT">צריך לפחות 6 הקשות יציבות. נסה שוב</div></div>
+  <div class="acts" id="calActs" hidden><button class="chip" id="calAgain">↻ שוב</button><button class="done" id="calDone">סיום</button></div>
+</div>
+
+<script>
+//---------------------------------------------------------------------
+//
+// QR Code Generator for JavaScript
+//
+// Copyright (c) 2009 Kazuhiko Arase
+//
+// URL: http://www.d-project.com/
+//
+// Licensed under the MIT license:
+//  http://www.opensource.org/licenses/mit-license.php
+//
+// The word 'QR Code' is registered trademark of
+// DENSO WAVE INCORPORATED
+//  http://www.denso-wave.com/qrcode/faqpatent-e.html
+//
+//---------------------------------------------------------------------
+
+var qrcode = function() {
+
+  //---------------------------------------------------------------------
+  // qrcode
+  //---------------------------------------------------------------------
+
+  /**
+   * qrcode
+   * @param typeNumber 1 to 40
+   * @param errorCorrectionLevel 'L','M','Q','H'
+   */
+  var qrcode = function(typeNumber, errorCorrectionLevel) {
+
+    var PAD0 = 0xEC;
+    var PAD1 = 0x11;
+
+    var _typeNumber = typeNumber;
+    var _errorCorrectionLevel = QRErrorCorrectionLevel[errorCorrectionLevel];
+    var _modules = null;
+    var _moduleCount = 0;
+    var _dataCache = null;
+    var _dataList = [];
+
+    var _this = {};
+
+    var makeImpl = function(test, maskPattern) {
+
+      _moduleCount = _typeNumber * 4 + 17;
+      _modules = function(moduleCount) {
+        var modules = new Array(moduleCount);
+        for (var row = 0; row < moduleCount; row += 1) {
+          modules[row] = new Array(moduleCount);
+          for (var col = 0; col < moduleCount; col += 1) {
+            modules[row][col] = null;
+          }
+        }
+        return modules;
+      }(_moduleCount);
+
+      setupPositionProbePattern(0, 0);
+      setupPositionProbePattern(_moduleCount - 7, 0);
+      setupPositionProbePattern(0, _moduleCount - 7);
+      setupPositionAdjustPattern();
+      setupTimingPattern();
+      setupTypeInfo(test, maskPattern);
+
+      if (_typeNumber >= 7) {
+        setupTypeNumber(test);
+      }
+
+      if (_dataCache == null) {
+        _dataCache = createData(_typeNumber, _errorCorrectionLevel, _dataList);
+      }
+
+      mapData(_dataCache, maskPattern);
+    };
+
+    var setupPositionProbePattern = function(row, col) {
+
+      for (var r = -1; r <= 7; r += 1) {
+
+        if (row + r <= -1 || _moduleCount <= row + r) continue;
+
+        for (var c = -1; c <= 7; c += 1) {
+
+          if (col + c <= -1 || _moduleCount <= col + c) continue;
+
+          if ( (0 <= r && r <= 6 && (c == 0 || c == 6) )
+              || (0 <= c && c <= 6 && (r == 0 || r == 6) )
+              || (2 <= r && r <= 4 && 2 <= c && c <= 4) ) {
+            _modules[row + r][col + c] = true;
+          } else {
+            _modules[row + r][col + c] = false;
+          }
+        }
+      }
+    };
+
+    var getBestMaskPattern = function() {
+
+      var minLostPoint = 0;
+      var pattern = 0;
+
+      for (var i = 0; i < 8; i += 1) {
+
+        makeImpl(true, i);
+
+        var lostPoint = QRUtil.getLostPoint(_this);
+
+        if (i == 0 || minLostPoint > lostPoint) {
+          minLostPoint = lostPoint;
+          pattern = i;
+        }
+      }
+
+      return pattern;
+    };
+
+    var setupTimingPattern = function() {
+
+      for (var r = 8; r < _moduleCount - 8; r += 1) {
+        if (_modules[r][6] != null) {
+          continue;
+        }
+        _modules[r][6] = (r % 2 == 0);
+      }
+
+      for (var c = 8; c < _moduleCount - 8; c += 1) {
+        if (_modules[6][c] != null) {
+          continue;
+        }
+        _modules[6][c] = (c % 2 == 0);
+      }
+    };
+
+    var setupPositionAdjustPattern = function() {
+
+      var pos = QRUtil.getPatternPosition(_typeNumber);
+
+      for (var i = 0; i < pos.length; i += 1) {
+
+        for (var j = 0; j < pos.length; j += 1) {
+
+          var row = pos[i];
+          var col = pos[j];
+
+          if (_modules[row][col] != null) {
+            continue;
+          }
+
+          for (var r = -2; r <= 2; r += 1) {
+
+            for (var c = -2; c <= 2; c += 1) {
+
+              if (r == -2 || r == 2 || c == -2 || c == 2
+                  || (r == 0 && c == 0) ) {
+                _modules[row + r][col + c] = true;
+              } else {
+                _modules[row + r][col + c] = false;
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var setupTypeNumber = function(test) {
+
+      var bits = QRUtil.getBCHTypeNumber(_typeNumber);
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[Math.floor(i / 3)][i % 3 + _moduleCount - 8 - 3] = mod;
+      }
+
+      for (var i = 0; i < 18; i += 1) {
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+        _modules[i % 3 + _moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
+      }
+    };
+
+    var setupTypeInfo = function(test, maskPattern) {
+
+      var data = (_errorCorrectionLevel << 3) | maskPattern;
+      var bits = QRUtil.getBCHTypeInfo(data);
+
+      // vertical
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 6) {
+          _modules[i][8] = mod;
+        } else if (i < 8) {
+          _modules[i + 1][8] = mod;
+        } else {
+          _modules[_moduleCount - 15 + i][8] = mod;
+        }
+      }
+
+      // horizontal
+      for (var i = 0; i < 15; i += 1) {
+
+        var mod = (!test && ( (bits >> i) & 1) == 1);
+
+        if (i < 8) {
+          _modules[8][_moduleCount - i - 1] = mod;
+        } else if (i < 9) {
+          _modules[8][15 - i - 1 + 1] = mod;
+        } else {
+          _modules[8][15 - i - 1] = mod;
+        }
+      }
+
+      // fixed module
+      _modules[_moduleCount - 8][8] = (!test);
+    };
+
+    var mapData = function(data, maskPattern) {
+
+      var inc = -1;
+      var row = _moduleCount - 1;
+      var bitIndex = 7;
+      var byteIndex = 0;
+      var maskFunc = QRUtil.getMaskFunction(maskPattern);
+
+      for (var col = _moduleCount - 1; col > 0; col -= 2) {
+
+        if (col == 6) col -= 1;
+
+        while (true) {
+
+          for (var c = 0; c < 2; c += 1) {
+
+            if (_modules[row][col - c] == null) {
+
+              var dark = false;
+
+              if (byteIndex < data.length) {
+                dark = ( ( (data[byteIndex] >>> bitIndex) & 1) == 1);
+              }
+
+              var mask = maskFunc(row, col - c);
+
+              if (mask) {
+                dark = !dark;
+              }
+
+              _modules[row][col - c] = dark;
+              bitIndex -= 1;
+
+              if (bitIndex == -1) {
+                byteIndex += 1;
+                bitIndex = 7;
+              }
+            }
+          }
+
+          row += inc;
+
+          if (row < 0 || _moduleCount <= row) {
+            row -= inc;
+            inc = -inc;
+            break;
+          }
+        }
+      }
+    };
+
+    var createBytes = function(buffer, rsBlocks) {
+
+      var offset = 0;
+
+      var maxDcCount = 0;
+      var maxEcCount = 0;
+
+      var dcdata = new Array(rsBlocks.length);
+      var ecdata = new Array(rsBlocks.length);
+
+      for (var r = 0; r < rsBlocks.length; r += 1) {
+
+        var dcCount = rsBlocks[r].dataCount;
+        var ecCount = rsBlocks[r].totalCount - dcCount;
+
+        maxDcCount = Math.max(maxDcCount, dcCount);
+        maxEcCount = Math.max(maxEcCount, ecCount);
+
+        dcdata[r] = new Array(dcCount);
+
+        for (var i = 0; i < dcdata[r].length; i += 1) {
+          dcdata[r][i] = 0xff & buffer.getBuffer()[i + offset];
+        }
+        offset += dcCount;
+
+        var rsPoly = QRUtil.getErrorCorrectPolynomial(ecCount);
+        var rawPoly = qrPolynomial(dcdata[r], rsPoly.getLength() - 1);
+
+        var modPoly = rawPoly.mod(rsPoly);
+        ecdata[r] = new Array(rsPoly.getLength() - 1);
+        for (var i = 0; i < ecdata[r].length; i += 1) {
+          var modIndex = i + modPoly.getLength() - ecdata[r].length;
+          ecdata[r][i] = (modIndex >= 0)? modPoly.getAt(modIndex) : 0;
+        }
+      }
+
+      var totalCodeCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalCodeCount += rsBlocks[i].totalCount;
+      }
+
+      var data = new Array(totalCodeCount);
+      var index = 0;
+
+      for (var i = 0; i < maxDcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < dcdata[r].length) {
+            data[index] = dcdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      for (var i = 0; i < maxEcCount; i += 1) {
+        for (var r = 0; r < rsBlocks.length; r += 1) {
+          if (i < ecdata[r].length) {
+            data[index] = ecdata[r][i];
+            index += 1;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    var createData = function(typeNumber, errorCorrectionLevel, dataList) {
+
+      var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, errorCorrectionLevel);
+
+      var buffer = qrBitBuffer();
+
+      for (var i = 0; i < dataList.length; i += 1) {
+        var data = dataList[i];
+        buffer.put(data.getMode(), 4);
+        buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+        data.write(buffer);
+      }
+
+      // calc num max data.
+      var totalDataCount = 0;
+      for (var i = 0; i < rsBlocks.length; i += 1) {
+        totalDataCount += rsBlocks[i].dataCount;
+      }
+
+      if (buffer.getLengthInBits() > totalDataCount * 8) {
+        throw 'code length overflow. ('
+          + buffer.getLengthInBits()
+          + '>'
+          + totalDataCount * 8
+          + ')';
+      }
+
+      // end code
+      if (buffer.getLengthInBits() + 4 <= totalDataCount * 8) {
+        buffer.put(0, 4);
+      }
+
+      // padding
+      while (buffer.getLengthInBits() % 8 != 0) {
+        buffer.putBit(false);
+      }
+
+      // padding
+      while (true) {
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD0, 8);
+
+        if (buffer.getLengthInBits() >= totalDataCount * 8) {
+          break;
+        }
+        buffer.put(PAD1, 8);
+      }
+
+      return createBytes(buffer, rsBlocks);
+    };
+
+    _this.addData = function(data, mode) {
+
+      mode = mode || 'Byte';
+
+      var newData = null;
+
+      switch(mode) {
+      case 'Numeric' :
+        newData = qrNumber(data);
+        break;
+      case 'Alphanumeric' :
+        newData = qrAlphaNum(data);
+        break;
+      case 'Byte' :
+        newData = qr8BitByte(data);
+        break;
+      case 'Kanji' :
+        newData = qrKanji(data);
+        break;
+      default :
+        throw 'mode:' + mode;
+      }
+
+      _dataList.push(newData);
+      _dataCache = null;
+    };
+
+    _this.isDark = function(row, col) {
+      if (row < 0 || _moduleCount <= row || col < 0 || _moduleCount <= col) {
+        throw row + ',' + col;
+      }
+      return _modules[row][col];
+    };
+
+    _this.getModuleCount = function() {
+      return _moduleCount;
+    };
+
+    _this.make = function() {
+      if (_typeNumber < 1) {
+        var typeNumber = 1;
+
+        for (; typeNumber < 40; typeNumber++) {
+          var rsBlocks = QRRSBlock.getRSBlocks(typeNumber, _errorCorrectionLevel);
+          var buffer = qrBitBuffer();
+
+          for (var i = 0; i < _dataList.length; i++) {
+            var data = _dataList[i];
+            buffer.put(data.getMode(), 4);
+            buffer.put(data.getLength(), QRUtil.getLengthInBits(data.getMode(), typeNumber) );
+            data.write(buffer);
+          }
+
+          var totalDataCount = 0;
+          for (var i = 0; i < rsBlocks.length; i++) {
+            totalDataCount += rsBlocks[i].dataCount;
+          }
+
+          if (buffer.getLengthInBits() <= totalDataCount * 8) {
+            break;
+          }
+        }
+
+        _typeNumber = typeNumber;
+      }
+
+      makeImpl(false, getBestMaskPattern() );
+    };
+
+    _this.createTableTag = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var qrHtml = '';
+
+      qrHtml += '<table style="';
+      qrHtml += ' border-width: 0px; border-style: none;';
+      qrHtml += ' border-collapse: collapse;';
+      qrHtml += ' padding: 0px; margin: ' + margin + 'px;';
+      qrHtml += '">';
+      qrHtml += '<tbody>';
+
+      for (var r = 0; r < _this.getModuleCount(); r += 1) {
+
+        qrHtml += '<tr>';
+
+        for (var c = 0; c < _this.getModuleCount(); c += 1) {
+          qrHtml += '<td style="';
+          qrHtml += ' border-width: 0px; border-style: none;';
+          qrHtml += ' border-collapse: collapse;';
+          qrHtml += ' padding: 0px; margin: 0px;';
+          qrHtml += ' width: ' + cellSize + 'px;';
+          qrHtml += ' height: ' + cellSize + 'px;';
+          qrHtml += ' background-color: ';
+          qrHtml += _this.isDark(r, c)? '#000000' : '#ffffff';
+          qrHtml += ';';
+          qrHtml += '"/>';
+        }
+
+        qrHtml += '</tr>';
+      }
+
+      qrHtml += '</tbody>';
+      qrHtml += '</table>';
+
+      return qrHtml;
+    };
+
+    _this.createSvgTag = function(cellSize, margin, alt, title) {
+
+      var opts = {};
+      if (typeof arguments[0] == 'object') {
+        // Called by options.
+        opts = arguments[0];
+        // overwrite cellSize and margin.
+        cellSize = opts.cellSize;
+        margin = opts.margin;
+        alt = opts.alt;
+        title = opts.title;
+      }
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      // Compose alt property surrogate
+      alt = (typeof alt === 'string') ? {text: alt} : alt || {};
+      alt.text = alt.text || null;
+      alt.id = (alt.text) ? alt.id || 'qrcode-description' : null;
+
+      // Compose title property surrogate
+      title = (typeof title === 'string') ? {text: title} : title || {};
+      title.text = title.text || null;
+      title.id = (title.text) ? title.id || 'qrcode-title' : null;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var c, mc, r, mr, qrSvg='', rect;
+
+      rect = 'l' + cellSize + ',0 0,' + cellSize +
+        ' -' + cellSize + ',0 0,-' + cellSize + 'z ';
+
+      qrSvg += '<svg version="1.1" xmlns="http://www.w3.org/2000/svg"';
+      qrSvg += !opts.scalable ? ' width="' + size + 'px" height="' + size + 'px"' : '';
+      qrSvg += ' viewBox="0 0 ' + size + ' ' + size + '" ';
+      qrSvg += ' preserveAspectRatio="xMinYMin meet"';
+      qrSvg += (title.text || alt.text) ? ' role="img" aria-labelledby="' +
+          escapeXml([title.id, alt.id].join(' ').trim() ) + '"' : '';
+      qrSvg += '>';
+      qrSvg += (title.text) ? '<title id="' + escapeXml(title.id) + '">' +
+          escapeXml(title.text) + '</title>' : '';
+      qrSvg += (alt.text) ? '<description id="' + escapeXml(alt.id) + '">' +
+          escapeXml(alt.text) + '</description>' : '';
+      qrSvg += '<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>';
+      qrSvg += '<path d="';
+
+      for (r = 0; r < _this.getModuleCount(); r += 1) {
+        mr = r * cellSize + margin;
+        for (c = 0; c < _this.getModuleCount(); c += 1) {
+          if (_this.isDark(r, c) ) {
+            mc = c*cellSize+margin;
+            qrSvg += 'M' + mc + ',' + mr + rect;
+          }
+        }
+      }
+
+      qrSvg += '" stroke="transparent" fill="black"/>';
+      qrSvg += '</svg>';
+
+      return qrSvg;
+    };
+
+    _this.createDataURL = function(cellSize, margin) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      return createDataURL(size, size, function(x, y) {
+        if (min <= x && x < max && min <= y && y < max) {
+          var c = Math.floor( (x - min) / cellSize);
+          var r = Math.floor( (y - min) / cellSize);
+          return _this.isDark(r, c)? 0 : 1;
+        } else {
+          return 1;
+        }
+      } );
+    };
+
+    _this.createImgTag = function(cellSize, margin, alt) {
+
+      cellSize = cellSize || 2;
+      margin = (typeof margin == 'undefined')? cellSize * 4 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+
+      var img = '';
+      img += '<img';
+      img += '\u0020src="';
+      img += _this.createDataURL(cellSize, margin);
+      img += '"';
+      img += '\u0020width="';
+      img += size;
+      img += '"';
+      img += '\u0020height="';
+      img += size;
+      img += '"';
+      if (alt) {
+        img += '\u0020alt="';
+        img += escapeXml(alt);
+        img += '"';
+      }
+      img += '/>';
+
+      return img;
+    };
+
+    var escapeXml = function(s) {
+      var escaped = '';
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charAt(i);
+        switch(c) {
+        case '<': escaped += '&lt;'; break;
+        case '>': escaped += '&gt;'; break;
+        case '&': escaped += '&amp;'; break;
+        case '"': escaped += '&quot;'; break;
+        default : escaped += c; break;
+        }
+      }
+      return escaped;
+    };
+
+    var _createHalfASCII = function(margin) {
+      var cellSize = 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r1, r2, p;
+
+      var blocks = {
+        '██': '█',
+        '█ ': '▀',
+        ' █': '▄',
+        '  ': ' '
+      };
+
+      var blocksLastLineNoMargin = {
+        '██': '▀',
+        '█ ': '▀',
+        ' █': ' ',
+        '  ': ' '
+      };
+
+      var ascii = '';
+      for (y = 0; y < size; y += 2) {
+        r1 = Math.floor((y - min) / cellSize);
+        r2 = Math.floor((y + 1 - min) / cellSize);
+        for (x = 0; x < size; x += 1) {
+          p = '█';
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r1, Math.floor((x - min) / cellSize))) {
+            p = ' ';
+          }
+
+          if (min <= x && x < max && min <= y+1 && y+1 < max && _this.isDark(r2, Math.floor((x - min) / cellSize))) {
+            p += ' ';
+          }
+          else {
+            p += '█';
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          ascii += (margin < 1 && y+1 >= max) ? blocksLastLineNoMargin[p] : blocks[p];
+        }
+
+        ascii += '\n';
+      }
+
+      if (size % 2 && margin > 0) {
+        return ascii.substring(0, ascii.length - size - 1) + Array(size+1).join('▀');
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.createASCII = function(cellSize, margin) {
+      cellSize = cellSize || 1;
+
+      if (cellSize < 2) {
+        return _createHalfASCII(margin);
+      }
+
+      cellSize -= 1;
+      margin = (typeof margin == 'undefined')? cellSize * 2 : margin;
+
+      var size = _this.getModuleCount() * cellSize + margin * 2;
+      var min = margin;
+      var max = size - margin;
+
+      var y, x, r, p;
+
+      var white = Array(cellSize+1).join('██');
+      var black = Array(cellSize+1).join('  ');
+
+      var ascii = '';
+      var line = '';
+      for (y = 0; y < size; y += 1) {
+        r = Math.floor( (y - min) / cellSize);
+        line = '';
+        for (x = 0; x < size; x += 1) {
+          p = 1;
+
+          if (min <= x && x < max && min <= y && y < max && _this.isDark(r, Math.floor((x - min) / cellSize))) {
+            p = 0;
+          }
+
+          // Output 2 characters per pixel, to create full square. 1 character per pixels gives only half width of square.
+          line += p ? white : black;
+        }
+
+        for (r = 0; r < cellSize; r += 1) {
+          ascii += line + '\n';
+        }
+      }
+
+      return ascii.substring(0, ascii.length-1);
+    };
+
+    _this.renderTo2dContext = function(context, cellSize) {
+      cellSize = cellSize || 2;
+      var length = _this.getModuleCount();
+      for (var row = 0; row < length; row++) {
+        for (var col = 0; col < length; col++) {
+          context.fillStyle = _this.isDark(row, col) ? 'black' : 'white';
+          context.fillRect(row * cellSize, col * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrcode.stringToBytes
+  //---------------------------------------------------------------------
+
+  qrcode.stringToBytesFuncs = {
+    'default' : function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        bytes.push(c & 0xff);
+      }
+      return bytes;
+    }
+  };
+
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['default'];
+
+  //---------------------------------------------------------------------
+  // qrcode.createStringToBytes
+  //---------------------------------------------------------------------
+
+  /**
+   * @param unicodeData base64 string of byte array.
+   * [16bit Unicode],[16bit Bytes], ...
+   * @param numChars
+   */
+  qrcode.createStringToBytes = function(unicodeData, numChars) {
+
+    // create conversion map.
+
+    var unicodeMap = function() {
+
+      var bin = base64DecodeInputStream(unicodeData);
+      var read = function() {
+        var b = bin.read();
+        if (b == -1) throw 'eof';
+        return b;
+      };
+
+      var count = 0;
+      var unicodeMap = {};
+      while (true) {
+        var b0 = bin.read();
+        if (b0 == -1) break;
+        var b1 = read();
+        var b2 = read();
+        var b3 = read();
+        var k = String.fromCharCode( (b0 << 8) | b1);
+        var v = (b2 << 8) | b3;
+        unicodeMap[k] = v;
+        count += 1;
+      }
+      if (count != numChars) {
+        throw count + ' != ' + numChars;
+      }
+
+      return unicodeMap;
+    }();
+
+    var unknownChar = '?'.charCodeAt(0);
+
+    return function(s) {
+      var bytes = [];
+      for (var i = 0; i < s.length; i += 1) {
+        var c = s.charCodeAt(i);
+        if (c < 128) {
+          bytes.push(c);
+        } else {
+          var b = unicodeMap[s.charAt(i)];
+          if (typeof b == 'number') {
+            if ( (b & 0xff) == b) {
+              // 1byte
+              bytes.push(b);
+            } else {
+              // 2bytes
+              bytes.push(b >>> 8);
+              bytes.push(b & 0xff);
+            }
+          } else {
+            bytes.push(unknownChar);
+          }
+        }
+      }
+      return bytes;
+    };
+  };
+
+  //---------------------------------------------------------------------
+  // QRMode
+  //---------------------------------------------------------------------
+
+  var QRMode = {
+    MODE_NUMBER :    1 << 0,
+    MODE_ALPHA_NUM : 1 << 1,
+    MODE_8BIT_BYTE : 1 << 2,
+    MODE_KANJI :     1 << 3
+  };
+
+  //---------------------------------------------------------------------
+  // QRErrorCorrectionLevel
+  //---------------------------------------------------------------------
+
+  var QRErrorCorrectionLevel = {
+    L : 1,
+    M : 0,
+    Q : 3,
+    H : 2
+  };
+
+  //---------------------------------------------------------------------
+  // QRMaskPattern
+  //---------------------------------------------------------------------
+
+  var QRMaskPattern = {
+    PATTERN000 : 0,
+    PATTERN001 : 1,
+    PATTERN010 : 2,
+    PATTERN011 : 3,
+    PATTERN100 : 4,
+    PATTERN101 : 5,
+    PATTERN110 : 6,
+    PATTERN111 : 7
+  };
+
+  //---------------------------------------------------------------------
+  // QRUtil
+  //---------------------------------------------------------------------
+
+  var QRUtil = function() {
+
+    var PATTERN_POSITION_TABLE = [
+      [],
+      [6, 18],
+      [6, 22],
+      [6, 26],
+      [6, 30],
+      [6, 34],
+      [6, 22, 38],
+      [6, 24, 42],
+      [6, 26, 46],
+      [6, 28, 50],
+      [6, 30, 54],
+      [6, 32, 58],
+      [6, 34, 62],
+      [6, 26, 46, 66],
+      [6, 26, 48, 70],
+      [6, 26, 50, 74],
+      [6, 30, 54, 78],
+      [6, 30, 56, 82],
+      [6, 30, 58, 86],
+      [6, 34, 62, 90],
+      [6, 28, 50, 72, 94],
+      [6, 26, 50, 74, 98],
+      [6, 30, 54, 78, 102],
+      [6, 28, 54, 80, 106],
+      [6, 32, 58, 84, 110],
+      [6, 30, 58, 86, 114],
+      [6, 34, 62, 90, 118],
+      [6, 26, 50, 74, 98, 122],
+      [6, 30, 54, 78, 102, 126],
+      [6, 26, 52, 78, 104, 130],
+      [6, 30, 56, 82, 108, 134],
+      [6, 34, 60, 86, 112, 138],
+      [6, 30, 58, 86, 114, 142],
+      [6, 34, 62, 90, 118, 146],
+      [6, 30, 54, 78, 102, 126, 150],
+      [6, 24, 50, 76, 102, 128, 154],
+      [6, 28, 54, 80, 106, 132, 158],
+      [6, 32, 58, 84, 110, 136, 162],
+      [6, 26, 54, 82, 110, 138, 166],
+      [6, 30, 58, 86, 114, 142, 170]
+    ];
+    var G15 = (1 << 10) | (1 << 8) | (1 << 5) | (1 << 4) | (1 << 2) | (1 << 1) | (1 << 0);
+    var G18 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | (1 << 8) | (1 << 5) | (1 << 2) | (1 << 0);
+    var G15_MASK = (1 << 14) | (1 << 12) | (1 << 10) | (1 << 4) | (1 << 1);
+
+    var _this = {};
+
+    var getBCHDigit = function(data) {
+      var digit = 0;
+      while (data != 0) {
+        digit += 1;
+        data >>>= 1;
+      }
+      return digit;
+    };
+
+    _this.getBCHTypeInfo = function(data) {
+      var d = data << 10;
+      while (getBCHDigit(d) - getBCHDigit(G15) >= 0) {
+        d ^= (G15 << (getBCHDigit(d) - getBCHDigit(G15) ) );
+      }
+      return ( (data << 10) | d) ^ G15_MASK;
+    };
+
+    _this.getBCHTypeNumber = function(data) {
+      var d = data << 12;
+      while (getBCHDigit(d) - getBCHDigit(G18) >= 0) {
+        d ^= (G18 << (getBCHDigit(d) - getBCHDigit(G18) ) );
+      }
+      return (data << 12) | d;
+    };
+
+    _this.getPatternPosition = function(typeNumber) {
+      return PATTERN_POSITION_TABLE[typeNumber - 1];
+    };
+
+    _this.getMaskFunction = function(maskPattern) {
+
+      switch (maskPattern) {
+
+      case QRMaskPattern.PATTERN000 :
+        return function(i, j) { return (i + j) % 2 == 0; };
+      case QRMaskPattern.PATTERN001 :
+        return function(i, j) { return i % 2 == 0; };
+      case QRMaskPattern.PATTERN010 :
+        return function(i, j) { return j % 3 == 0; };
+      case QRMaskPattern.PATTERN011 :
+        return function(i, j) { return (i + j) % 3 == 0; };
+      case QRMaskPattern.PATTERN100 :
+        return function(i, j) { return (Math.floor(i / 2) + Math.floor(j / 3) ) % 2 == 0; };
+      case QRMaskPattern.PATTERN101 :
+        return function(i, j) { return (i * j) % 2 + (i * j) % 3 == 0; };
+      case QRMaskPattern.PATTERN110 :
+        return function(i, j) { return ( (i * j) % 2 + (i * j) % 3) % 2 == 0; };
+      case QRMaskPattern.PATTERN111 :
+        return function(i, j) { return ( (i * j) % 3 + (i + j) % 2) % 2 == 0; };
+
+      default :
+        throw 'bad maskPattern:' + maskPattern;
+      }
+    };
+
+    _this.getErrorCorrectPolynomial = function(errorCorrectLength) {
+      var a = qrPolynomial([1], 0);
+      for (var i = 0; i < errorCorrectLength; i += 1) {
+        a = a.multiply(qrPolynomial([1, QRMath.gexp(i)], 0) );
+      }
+      return a;
+    };
+
+    _this.getLengthInBits = function(mode, type) {
+
+      if (1 <= type && type < 10) {
+
+        // 1 - 9
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 10;
+        case QRMode.MODE_ALPHA_NUM : return 9;
+        case QRMode.MODE_8BIT_BYTE : return 8;
+        case QRMode.MODE_KANJI     : return 8;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 27) {
+
+        // 10 - 26
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 12;
+        case QRMode.MODE_ALPHA_NUM : return 11;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 10;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else if (type < 41) {
+
+        // 27 - 40
+
+        switch(mode) {
+        case QRMode.MODE_NUMBER    : return 14;
+        case QRMode.MODE_ALPHA_NUM : return 13;
+        case QRMode.MODE_8BIT_BYTE : return 16;
+        case QRMode.MODE_KANJI     : return 12;
+        default :
+          throw 'mode:' + mode;
+        }
+
+      } else {
+        throw 'type:' + type;
+      }
+    };
+
+    _this.getLostPoint = function(qrcode) {
+
+      var moduleCount = qrcode.getModuleCount();
+
+      var lostPoint = 0;
+
+      // LEVEL1
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount; col += 1) {
+
+          var sameCount = 0;
+          var dark = qrcode.isDark(row, col);
+
+          for (var r = -1; r <= 1; r += 1) {
+
+            if (row + r < 0 || moduleCount <= row + r) {
+              continue;
+            }
+
+            for (var c = -1; c <= 1; c += 1) {
+
+              if (col + c < 0 || moduleCount <= col + c) {
+                continue;
+              }
+
+              if (r == 0 && c == 0) {
+                continue;
+              }
+
+              if (dark == qrcode.isDark(row + r, col + c) ) {
+                sameCount += 1;
+              }
+            }
+          }
+
+          if (sameCount > 5) {
+            lostPoint += (3 + sameCount - 5);
+          }
+        }
+      };
+
+      // LEVEL2
+
+      for (var row = 0; row < moduleCount - 1; row += 1) {
+        for (var col = 0; col < moduleCount - 1; col += 1) {
+          var count = 0;
+          if (qrcode.isDark(row, col) ) count += 1;
+          if (qrcode.isDark(row + 1, col) ) count += 1;
+          if (qrcode.isDark(row, col + 1) ) count += 1;
+          if (qrcode.isDark(row + 1, col + 1) ) count += 1;
+          if (count == 0 || count == 4) {
+            lostPoint += 3;
+          }
+        }
+      }
+
+      // LEVEL3
+
+      for (var row = 0; row < moduleCount; row += 1) {
+        for (var col = 0; col < moduleCount - 6; col += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row, col + 1)
+              &&  qrcode.isDark(row, col + 2)
+              &&  qrcode.isDark(row, col + 3)
+              &&  qrcode.isDark(row, col + 4)
+              && !qrcode.isDark(row, col + 5)
+              &&  qrcode.isDark(row, col + 6) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount - 6; row += 1) {
+          if (qrcode.isDark(row, col)
+              && !qrcode.isDark(row + 1, col)
+              &&  qrcode.isDark(row + 2, col)
+              &&  qrcode.isDark(row + 3, col)
+              &&  qrcode.isDark(row + 4, col)
+              && !qrcode.isDark(row + 5, col)
+              &&  qrcode.isDark(row + 6, col) ) {
+            lostPoint += 40;
+          }
+        }
+      }
+
+      // LEVEL4
+
+      var darkCount = 0;
+
+      for (var col = 0; col < moduleCount; col += 1) {
+        for (var row = 0; row < moduleCount; row += 1) {
+          if (qrcode.isDark(row, col) ) {
+            darkCount += 1;
+          }
+        }
+      }
+
+      var ratio = Math.abs(100 * darkCount / moduleCount / moduleCount - 50) / 5;
+      lostPoint += ratio * 10;
+
+      return lostPoint;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // QRMath
+  //---------------------------------------------------------------------
+
+  var QRMath = function() {
+
+    var EXP_TABLE = new Array(256);
+    var LOG_TABLE = new Array(256);
+
+    // initialize tables
+    for (var i = 0; i < 8; i += 1) {
+      EXP_TABLE[i] = 1 << i;
+    }
+    for (var i = 8; i < 256; i += 1) {
+      EXP_TABLE[i] = EXP_TABLE[i - 4]
+        ^ EXP_TABLE[i - 5]
+        ^ EXP_TABLE[i - 6]
+        ^ EXP_TABLE[i - 8];
+    }
+    for (var i = 0; i < 255; i += 1) {
+      LOG_TABLE[EXP_TABLE[i] ] = i;
+    }
+
+    var _this = {};
+
+    _this.glog = function(n) {
+
+      if (n < 1) {
+        throw 'glog(' + n + ')';
+      }
+
+      return LOG_TABLE[n];
+    };
+
+    _this.gexp = function(n) {
+
+      while (n < 0) {
+        n += 255;
+      }
+
+      while (n >= 256) {
+        n -= 255;
+      }
+
+      return EXP_TABLE[n];
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrPolynomial
+  //---------------------------------------------------------------------
+
+  function qrPolynomial(num, shift) {
+
+    if (typeof num.length == 'undefined') {
+      throw num.length + '/' + shift;
+    }
+
+    var _num = function() {
+      var offset = 0;
+      while (offset < num.length && num[offset] == 0) {
+        offset += 1;
+      }
+      var _num = new Array(num.length - offset + shift);
+      for (var i = 0; i < num.length - offset; i += 1) {
+        _num[i] = num[i + offset];
+      }
+      return _num;
+    }();
+
+    var _this = {};
+
+    _this.getAt = function(index) {
+      return _num[index];
+    };
+
+    _this.getLength = function() {
+      return _num.length;
+    };
+
+    _this.multiply = function(e) {
+
+      var num = new Array(_this.getLength() + e.getLength() - 1);
+
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        for (var j = 0; j < e.getLength(); j += 1) {
+          num[i + j] ^= QRMath.gexp(QRMath.glog(_this.getAt(i) ) + QRMath.glog(e.getAt(j) ) );
+        }
+      }
+
+      return qrPolynomial(num, 0);
+    };
+
+    _this.mod = function(e) {
+
+      if (_this.getLength() - e.getLength() < 0) {
+        return _this;
+      }
+
+      var ratio = QRMath.glog(_this.getAt(0) ) - QRMath.glog(e.getAt(0) );
+
+      var num = new Array(_this.getLength() );
+      for (var i = 0; i < _this.getLength(); i += 1) {
+        num[i] = _this.getAt(i);
+      }
+
+      for (var i = 0; i < e.getLength(); i += 1) {
+        num[i] ^= QRMath.gexp(QRMath.glog(e.getAt(i) ) + ratio);
+      }
+
+      // recursive call
+      return qrPolynomial(num, 0).mod(e);
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // QRRSBlock
+  //---------------------------------------------------------------------
+
+  var QRRSBlock = function() {
+
+    var RS_BLOCK_TABLE = [
+
+      // L
+      // M
+      // Q
+      // H
+
+      // 1
+      [1, 26, 19],
+      [1, 26, 16],
+      [1, 26, 13],
+      [1, 26, 9],
+
+      // 2
+      [1, 44, 34],
+      [1, 44, 28],
+      [1, 44, 22],
+      [1, 44, 16],
+
+      // 3
+      [1, 70, 55],
+      [1, 70, 44],
+      [2, 35, 17],
+      [2, 35, 13],
+
+      // 4
+      [1, 100, 80],
+      [2, 50, 32],
+      [2, 50, 24],
+      [4, 25, 9],
+
+      // 5
+      [1, 134, 108],
+      [2, 67, 43],
+      [2, 33, 15, 2, 34, 16],
+      [2, 33, 11, 2, 34, 12],
+
+      // 6
+      [2, 86, 68],
+      [4, 43, 27],
+      [4, 43, 19],
+      [4, 43, 15],
+
+      // 7
+      [2, 98, 78],
+      [4, 49, 31],
+      [2, 32, 14, 4, 33, 15],
+      [4, 39, 13, 1, 40, 14],
+
+      // 8
+      [2, 121, 97],
+      [2, 60, 38, 2, 61, 39],
+      [4, 40, 18, 2, 41, 19],
+      [4, 40, 14, 2, 41, 15],
+
+      // 9
+      [2, 146, 116],
+      [3, 58, 36, 2, 59, 37],
+      [4, 36, 16, 4, 37, 17],
+      [4, 36, 12, 4, 37, 13],
+
+      // 10
+      [2, 86, 68, 2, 87, 69],
+      [4, 69, 43, 1, 70, 44],
+      [6, 43, 19, 2, 44, 20],
+      [6, 43, 15, 2, 44, 16],
+
+      // 11
+      [4, 101, 81],
+      [1, 80, 50, 4, 81, 51],
+      [4, 50, 22, 4, 51, 23],
+      [3, 36, 12, 8, 37, 13],
+
+      // 12
+      [2, 116, 92, 2, 117, 93],
+      [6, 58, 36, 2, 59, 37],
+      [4, 46, 20, 6, 47, 21],
+      [7, 42, 14, 4, 43, 15],
+
+      // 13
+      [4, 133, 107],
+      [8, 59, 37, 1, 60, 38],
+      [8, 44, 20, 4, 45, 21],
+      [12, 33, 11, 4, 34, 12],
+
+      // 14
+      [3, 145, 115, 1, 146, 116],
+      [4, 64, 40, 5, 65, 41],
+      [11, 36, 16, 5, 37, 17],
+      [11, 36, 12, 5, 37, 13],
+
+      // 15
+      [5, 109, 87, 1, 110, 88],
+      [5, 65, 41, 5, 66, 42],
+      [5, 54, 24, 7, 55, 25],
+      [11, 36, 12, 7, 37, 13],
+
+      // 16
+      [5, 122, 98, 1, 123, 99],
+      [7, 73, 45, 3, 74, 46],
+      [15, 43, 19, 2, 44, 20],
+      [3, 45, 15, 13, 46, 16],
+
+      // 17
+      [1, 135, 107, 5, 136, 108],
+      [10, 74, 46, 1, 75, 47],
+      [1, 50, 22, 15, 51, 23],
+      [2, 42, 14, 17, 43, 15],
+
+      // 18
+      [5, 150, 120, 1, 151, 121],
+      [9, 69, 43, 4, 70, 44],
+      [17, 50, 22, 1, 51, 23],
+      [2, 42, 14, 19, 43, 15],
+
+      // 19
+      [3, 141, 113, 4, 142, 114],
+      [3, 70, 44, 11, 71, 45],
+      [17, 47, 21, 4, 48, 22],
+      [9, 39, 13, 16, 40, 14],
+
+      // 20
+      [3, 135, 107, 5, 136, 108],
+      [3, 67, 41, 13, 68, 42],
+      [15, 54, 24, 5, 55, 25],
+      [15, 43, 15, 10, 44, 16],
+
+      // 21
+      [4, 144, 116, 4, 145, 117],
+      [17, 68, 42],
+      [17, 50, 22, 6, 51, 23],
+      [19, 46, 16, 6, 47, 17],
+
+      // 22
+      [2, 139, 111, 7, 140, 112],
+      [17, 74, 46],
+      [7, 54, 24, 16, 55, 25],
+      [34, 37, 13],
+
+      // 23
+      [4, 151, 121, 5, 152, 122],
+      [4, 75, 47, 14, 76, 48],
+      [11, 54, 24, 14, 55, 25],
+      [16, 45, 15, 14, 46, 16],
+
+      // 24
+      [6, 147, 117, 4, 148, 118],
+      [6, 73, 45, 14, 74, 46],
+      [11, 54, 24, 16, 55, 25],
+      [30, 46, 16, 2, 47, 17],
+
+      // 25
+      [8, 132, 106, 4, 133, 107],
+      [8, 75, 47, 13, 76, 48],
+      [7, 54, 24, 22, 55, 25],
+      [22, 45, 15, 13, 46, 16],
+
+      // 26
+      [10, 142, 114, 2, 143, 115],
+      [19, 74, 46, 4, 75, 47],
+      [28, 50, 22, 6, 51, 23],
+      [33, 46, 16, 4, 47, 17],
+
+      // 27
+      [8, 152, 122, 4, 153, 123],
+      [22, 73, 45, 3, 74, 46],
+      [8, 53, 23, 26, 54, 24],
+      [12, 45, 15, 28, 46, 16],
+
+      // 28
+      [3, 147, 117, 10, 148, 118],
+      [3, 73, 45, 23, 74, 46],
+      [4, 54, 24, 31, 55, 25],
+      [11, 45, 15, 31, 46, 16],
+
+      // 29
+      [7, 146, 116, 7, 147, 117],
+      [21, 73, 45, 7, 74, 46],
+      [1, 53, 23, 37, 54, 24],
+      [19, 45, 15, 26, 46, 16],
+
+      // 30
+      [5, 145, 115, 10, 146, 116],
+      [19, 75, 47, 10, 76, 48],
+      [15, 54, 24, 25, 55, 25],
+      [23, 45, 15, 25, 46, 16],
+
+      // 31
+      [13, 145, 115, 3, 146, 116],
+      [2, 74, 46, 29, 75, 47],
+      [42, 54, 24, 1, 55, 25],
+      [23, 45, 15, 28, 46, 16],
+
+      // 32
+      [17, 145, 115],
+      [10, 74, 46, 23, 75, 47],
+      [10, 54, 24, 35, 55, 25],
+      [19, 45, 15, 35, 46, 16],
+
+      // 33
+      [17, 145, 115, 1, 146, 116],
+      [14, 74, 46, 21, 75, 47],
+      [29, 54, 24, 19, 55, 25],
+      [11, 45, 15, 46, 46, 16],
+
+      // 34
+      [13, 145, 115, 6, 146, 116],
+      [14, 74, 46, 23, 75, 47],
+      [44, 54, 24, 7, 55, 25],
+      [59, 46, 16, 1, 47, 17],
+
+      // 35
+      [12, 151, 121, 7, 152, 122],
+      [12, 75, 47, 26, 76, 48],
+      [39, 54, 24, 14, 55, 25],
+      [22, 45, 15, 41, 46, 16],
+
+      // 36
+      [6, 151, 121, 14, 152, 122],
+      [6, 75, 47, 34, 76, 48],
+      [46, 54, 24, 10, 55, 25],
+      [2, 45, 15, 64, 46, 16],
+
+      // 37
+      [17, 152, 122, 4, 153, 123],
+      [29, 74, 46, 14, 75, 47],
+      [49, 54, 24, 10, 55, 25],
+      [24, 45, 15, 46, 46, 16],
+
+      // 38
+      [4, 152, 122, 18, 153, 123],
+      [13, 74, 46, 32, 75, 47],
+      [48, 54, 24, 14, 55, 25],
+      [42, 45, 15, 32, 46, 16],
+
+      // 39
+      [20, 147, 117, 4, 148, 118],
+      [40, 75, 47, 7, 76, 48],
+      [43, 54, 24, 22, 55, 25],
+      [10, 45, 15, 67, 46, 16],
+
+      // 40
+      [19, 148, 118, 6, 149, 119],
+      [18, 75, 47, 31, 76, 48],
+      [34, 54, 24, 34, 55, 25],
+      [20, 45, 15, 61, 46, 16]
+    ];
+
+    var qrRSBlock = function(totalCount, dataCount) {
+      var _this = {};
+      _this.totalCount = totalCount;
+      _this.dataCount = dataCount;
+      return _this;
+    };
+
+    var _this = {};
+
+    var getRsBlockTable = function(typeNumber, errorCorrectionLevel) {
+
+      switch(errorCorrectionLevel) {
+      case QRErrorCorrectionLevel.L :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 0];
+      case QRErrorCorrectionLevel.M :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 1];
+      case QRErrorCorrectionLevel.Q :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 2];
+      case QRErrorCorrectionLevel.H :
+        return RS_BLOCK_TABLE[(typeNumber - 1) * 4 + 3];
+      default :
+        return undefined;
+      }
+    };
+
+    _this.getRSBlocks = function(typeNumber, errorCorrectionLevel) {
+
+      var rsBlock = getRsBlockTable(typeNumber, errorCorrectionLevel);
+
+      if (typeof rsBlock == 'undefined') {
+        throw 'bad rs block @ typeNumber:' + typeNumber +
+            '/errorCorrectionLevel:' + errorCorrectionLevel;
+      }
+
+      var length = rsBlock.length / 3;
+
+      var list = [];
+
+      for (var i = 0; i < length; i += 1) {
+
+        var count = rsBlock[i * 3 + 0];
+        var totalCount = rsBlock[i * 3 + 1];
+        var dataCount = rsBlock[i * 3 + 2];
+
+        for (var j = 0; j < count; j += 1) {
+          list.push(qrRSBlock(totalCount, dataCount) );
+        }
+      }
+
+      return list;
+    };
+
+    return _this;
+  }();
+
+  //---------------------------------------------------------------------
+  // qrBitBuffer
+  //---------------------------------------------------------------------
+
+  var qrBitBuffer = function() {
+
+    var _buffer = [];
+    var _length = 0;
+
+    var _this = {};
+
+    _this.getBuffer = function() {
+      return _buffer;
+    };
+
+    _this.getAt = function(index) {
+      var bufIndex = Math.floor(index / 8);
+      return ( (_buffer[bufIndex] >>> (7 - index % 8) ) & 1) == 1;
+    };
+
+    _this.put = function(num, length) {
+      for (var i = 0; i < length; i += 1) {
+        _this.putBit( ( (num >>> (length - i - 1) ) & 1) == 1);
+      }
+    };
+
+    _this.getLengthInBits = function() {
+      return _length;
+    };
+
+    _this.putBit = function(bit) {
+
+      var bufIndex = Math.floor(_length / 8);
+      if (_buffer.length <= bufIndex) {
+        _buffer.push(0);
+      }
+
+      if (bit) {
+        _buffer[bufIndex] |= (0x80 >>> (_length % 8) );
+      }
+
+      _length += 1;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrNumber
+  //---------------------------------------------------------------------
+
+  var qrNumber = function(data) {
+
+    var _mode = QRMode.MODE_NUMBER;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _data;
+
+      var i = 0;
+
+      while (i + 2 < data.length) {
+        buffer.put(strToNum(data.substring(i, i + 3) ), 10);
+        i += 3;
+      }
+
+      if (i < data.length) {
+        if (data.length - i == 1) {
+          buffer.put(strToNum(data.substring(i, i + 1) ), 4);
+        } else if (data.length - i == 2) {
+          buffer.put(strToNum(data.substring(i, i + 2) ), 7);
+        }
+      }
+    };
+
+    var strToNum = function(s) {
+      var num = 0;
+      for (var i = 0; i < s.length; i += 1) {
+        num = num * 10 + chatToNum(s.charAt(i) );
+      }
+      return num;
+    };
+
+    var chatToNum = function(c) {
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      }
+      throw 'illegal char :' + c;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrAlphaNum
+  //---------------------------------------------------------------------
+
+  var qrAlphaNum = function(data) {
+
+    var _mode = QRMode.MODE_ALPHA_NUM;
+    var _data = data;
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _data.length;
+    };
+
+    _this.write = function(buffer) {
+
+      var s = _data;
+
+      var i = 0;
+
+      while (i + 1 < s.length) {
+        buffer.put(
+          getCode(s.charAt(i) ) * 45 +
+          getCode(s.charAt(i + 1) ), 11);
+        i += 2;
+      }
+
+      if (i < s.length) {
+        buffer.put(getCode(s.charAt(i) ), 6);
+      }
+    };
+
+    var getCode = function(c) {
+
+      if ('0' <= c && c <= '9') {
+        return c.charCodeAt(0) - '0'.charCodeAt(0);
+      } else if ('A' <= c && c <= 'Z') {
+        return c.charCodeAt(0) - 'A'.charCodeAt(0) + 10;
+      } else {
+        switch (c) {
+        case ' ' : return 36;
+        case '$' : return 37;
+        case '%' : return 38;
+        case '*' : return 39;
+        case '+' : return 40;
+        case '-' : return 41;
+        case '.' : return 42;
+        case '/' : return 43;
+        case ':' : return 44;
+        default :
+          throw 'illegal char :' + c;
+        }
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qr8BitByte
+  //---------------------------------------------------------------------
+
+  var qr8BitByte = function(data) {
+
+    var _mode = QRMode.MODE_8BIT_BYTE;
+    var _data = data;
+    var _bytes = qrcode.stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return _bytes.length;
+    };
+
+    _this.write = function(buffer) {
+      for (var i = 0; i < _bytes.length; i += 1) {
+        buffer.put(_bytes[i], 8);
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // qrKanji
+  //---------------------------------------------------------------------
+
+  var qrKanji = function(data) {
+
+    var _mode = QRMode.MODE_KANJI;
+    var _data = data;
+
+    var stringToBytes = qrcode.stringToBytesFuncs['SJIS'];
+    if (!stringToBytes) {
+      throw 'sjis not supported.';
+    }
+    !function(c, code) {
+      // self test for sjis support.
+      var test = stringToBytes(c);
+      if (test.length != 2 || ( (test[0] << 8) | test[1]) != code) {
+        throw 'sjis not supported.';
+      }
+    }('\u53cb', 0x9746);
+
+    var _bytes = stringToBytes(data);
+
+    var _this = {};
+
+    _this.getMode = function() {
+      return _mode;
+    };
+
+    _this.getLength = function(buffer) {
+      return ~~(_bytes.length / 2);
+    };
+
+    _this.write = function(buffer) {
+
+      var data = _bytes;
+
+      var i = 0;
+
+      while (i + 1 < data.length) {
+
+        var c = ( (0xff & data[i]) << 8) | (0xff & data[i + 1]);
+
+        if (0x8140 <= c && c <= 0x9FFC) {
+          c -= 0x8140;
+        } else if (0xE040 <= c && c <= 0xEBBF) {
+          c -= 0xC140;
+        } else {
+          throw 'illegal char at ' + (i + 1) + '/' + c;
+        }
+
+        c = ( (c >>> 8) & 0xff) * 0xC0 + (c & 0xff);
+
+        buffer.put(c, 13);
+
+        i += 2;
+      }
+
+      if (i < data.length) {
+        throw 'illegal char at ' + (i + 1);
+      }
+    };
+
+    return _this;
+  };
+
+  //=====================================================================
+  // GIF Support etc.
+  //
+
+  //---------------------------------------------------------------------
+  // byteArrayOutputStream
+  //---------------------------------------------------------------------
+
+  var byteArrayOutputStream = function() {
+
+    var _bytes = [];
+
+    var _this = {};
+
+    _this.writeByte = function(b) {
+      _bytes.push(b & 0xff);
+    };
+
+    _this.writeShort = function(i) {
+      _this.writeByte(i);
+      _this.writeByte(i >>> 8);
+    };
+
+    _this.writeBytes = function(b, off, len) {
+      off = off || 0;
+      len = len || b.length;
+      for (var i = 0; i < len; i += 1) {
+        _this.writeByte(b[i + off]);
+      }
+    };
+
+    _this.writeString = function(s) {
+      for (var i = 0; i < s.length; i += 1) {
+        _this.writeByte(s.charCodeAt(i) );
+      }
+    };
+
+    _this.toByteArray = function() {
+      return _bytes;
+    };
+
+    _this.toString = function() {
+      var s = '';
+      s += '[';
+      for (var i = 0; i < _bytes.length; i += 1) {
+        if (i > 0) {
+          s += ',';
+        }
+        s += _bytes[i];
+      }
+      s += ']';
+      return s;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64EncodeOutputStream
+  //---------------------------------------------------------------------
+
+  var base64EncodeOutputStream = function() {
+
+    var _buffer = 0;
+    var _buflen = 0;
+    var _length = 0;
+    var _base64 = '';
+
+    var _this = {};
+
+    var writeEncoded = function(b) {
+      _base64 += String.fromCharCode(encode(b & 0x3f) );
+    };
+
+    var encode = function(n) {
+      if (n < 0) {
+        // error.
+      } else if (n < 26) {
+        return 0x41 + n;
+      } else if (n < 52) {
+        return 0x61 + (n - 26);
+      } else if (n < 62) {
+        return 0x30 + (n - 52);
+      } else if (n == 62) {
+        return 0x2b;
+      } else if (n == 63) {
+        return 0x2f;
+      }
+      throw 'n:' + n;
+    };
+
+    _this.writeByte = function(n) {
+
+      _buffer = (_buffer << 8) | (n & 0xff);
+      _buflen += 8;
+      _length += 1;
+
+      while (_buflen >= 6) {
+        writeEncoded(_buffer >>> (_buflen - 6) );
+        _buflen -= 6;
+      }
+    };
+
+    _this.flush = function() {
+
+      if (_buflen > 0) {
+        writeEncoded(_buffer << (6 - _buflen) );
+        _buffer = 0;
+        _buflen = 0;
+      }
+
+      if (_length % 3 != 0) {
+        // padding
+        var padlen = 3 - _length % 3;
+        for (var i = 0; i < padlen; i += 1) {
+          _base64 += '=';
+        }
+      }
+    };
+
+    _this.toString = function() {
+      return _base64;
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // base64DecodeInputStream
+  //---------------------------------------------------------------------
+
+  var base64DecodeInputStream = function(str) {
+
+    var _str = str;
+    var _pos = 0;
+    var _buffer = 0;
+    var _buflen = 0;
+
+    var _this = {};
+
+    _this.read = function() {
+
+      while (_buflen < 8) {
+
+        if (_pos >= _str.length) {
+          if (_buflen == 0) {
+            return -1;
+          }
+          throw 'unexpected end of file./' + _buflen;
+        }
+
+        var c = _str.charAt(_pos);
+        _pos += 1;
+
+        if (c == '=') {
+          _buflen = 0;
+          return -1;
+        } else if (c.match(/^\s$/) ) {
+          // ignore if whitespace.
+          continue;
+        }
+
+        _buffer = (_buffer << 6) | decode(c.charCodeAt(0) );
+        _buflen += 6;
+      }
+
+      var n = (_buffer >>> (_buflen - 8) ) & 0xff;
+      _buflen -= 8;
+      return n;
+    };
+
+    var decode = function(c) {
+      if (0x41 <= c && c <= 0x5a) {
+        return c - 0x41;
+      } else if (0x61 <= c && c <= 0x7a) {
+        return c - 0x61 + 26;
+      } else if (0x30 <= c && c <= 0x39) {
+        return c - 0x30 + 52;
+      } else if (c == 0x2b) {
+        return 62;
+      } else if (c == 0x2f) {
+        return 63;
+      } else {
+        throw 'c:' + c;
+      }
+    };
+
+    return _this;
+  };
+
+  //---------------------------------------------------------------------
+  // gifImage (B/W)
+  //---------------------------------------------------------------------
+
+  var gifImage = function(width, height) {
+
+    var _width = width;
+    var _height = height;
+    var _data = new Array(width * height);
+
+    var _this = {};
+
+    _this.setPixel = function(x, y, pixel) {
+      _data[y * _width + x] = pixel;
+    };
+
+    _this.write = function(out) {
+
+      //---------------------------------
+      // GIF Signature
+
+      out.writeString('GIF87a');
+
+      //---------------------------------
+      // Screen Descriptor
+
+      out.writeShort(_width);
+      out.writeShort(_height);
+
+      out.writeByte(0x80); // 2bit
+      out.writeByte(0);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Global Color Map
+
+      // black
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+      out.writeByte(0x00);
+
+      // white
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+      out.writeByte(0xff);
+
+      //---------------------------------
+      // Image Descriptor
+
+      out.writeString(',');
+      out.writeShort(0);
+      out.writeShort(0);
+      out.writeShort(_width);
+      out.writeShort(_height);
+      out.writeByte(0);
+
+      //---------------------------------
+      // Local Color Map
+
+      //---------------------------------
+      // Raster Data
+
+      var lzwMinCodeSize = 2;
+      var raster = getLZWRaster(lzwMinCodeSize);
+
+      out.writeByte(lzwMinCodeSize);
+
+      var offset = 0;
+
+      while (raster.length - offset > 255) {
+        out.writeByte(255);
+        out.writeBytes(raster, offset, 255);
+        offset += 255;
+      }
+
+      out.writeByte(raster.length - offset);
+      out.writeBytes(raster, offset, raster.length - offset);
+      out.writeByte(0x00);
+
+      //---------------------------------
+      // GIF Terminator
+      out.writeString(';');
+    };
+
+    var bitOutputStream = function(out) {
+
+      var _out = out;
+      var _bitLength = 0;
+      var _bitBuffer = 0;
+
+      var _this = {};
+
+      _this.write = function(data, length) {
+
+        if ( (data >>> length) != 0) {
+          throw 'length over';
+        }
+
+        while (_bitLength + length >= 8) {
+          _out.writeByte(0xff & ( (data << _bitLength) | _bitBuffer) );
+          length -= (8 - _bitLength);
+          data >>>= (8 - _bitLength);
+          _bitBuffer = 0;
+          _bitLength = 0;
+        }
+
+        _bitBuffer = (data << _bitLength) | _bitBuffer;
+        _bitLength = _bitLength + length;
+      };
+
+      _this.flush = function() {
+        if (_bitLength > 0) {
+          _out.writeByte(_bitBuffer);
+        }
+      };
+
+      return _this;
+    };
+
+    var getLZWRaster = function(lzwMinCodeSize) {
+
+      var clearCode = 1 << lzwMinCodeSize;
+      var endCode = (1 << lzwMinCodeSize) + 1;
+      var bitLength = lzwMinCodeSize + 1;
+
+      // Setup LZWTable
+      var table = lzwTable();
+
+      for (var i = 0; i < clearCode; i += 1) {
+        table.add(String.fromCharCode(i) );
+      }
+      table.add(String.fromCharCode(clearCode) );
+      table.add(String.fromCharCode(endCode) );
+
+      var byteOut = byteArrayOutputStream();
+      var bitOut = bitOutputStream(byteOut);
+
+      // clear code
+      bitOut.write(clearCode, bitLength);
+
+      var dataIndex = 0;
+
+      var s = String.fromCharCode(_data[dataIndex]);
+      dataIndex += 1;
+
+      while (dataIndex < _data.length) {
+
+        var c = String.fromCharCode(_data[dataIndex]);
+        dataIndex += 1;
+
+        if (table.contains(s + c) ) {
+
+          s = s + c;
+
+        } else {
+
+          bitOut.write(table.indexOf(s), bitLength);
+
+          if (table.size() < 0xfff) {
+
+            if (table.size() == (1 << bitLength) ) {
+              bitLength += 1;
+            }
+
+            table.add(s + c);
+          }
+
+          s = c;
+        }
+      }
+
+      bitOut.write(table.indexOf(s), bitLength);
+
+      // end code
+      bitOut.write(endCode, bitLength);
+
+      bitOut.flush();
+
+      return byteOut.toByteArray();
+    };
+
+    var lzwTable = function() {
+
+      var _map = {};
+      var _size = 0;
+
+      var _this = {};
+
+      _this.add = function(key) {
+        if (_this.contains(key) ) {
+          throw 'dup key:' + key;
+        }
+        _map[key] = _size;
+        _size += 1;
+      };
+
+      _this.size = function() {
+        return _size;
+      };
+
+      _this.indexOf = function(key) {
+        return _map[key];
+      };
+
+      _this.contains = function(key) {
+        return typeof _map[key] != 'undefined';
+      };
+
+      return _this;
+    };
+
+    return _this;
+  };
+
+  var createDataURL = function(width, height, getPixel) {
+    var gif = gifImage(width, height);
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        gif.setPixel(x, y, getPixel(x, y) );
+      }
+    }
+
+    var b = byteArrayOutputStream();
+    gif.write(b);
+
+    var base64 = base64EncodeOutputStream();
+    var bytes = b.toByteArray();
+    for (var i = 0; i < bytes.length; i += 1) {
+      base64.writeByte(bytes[i]);
+    }
+    base64.flush();
+
+    return 'data:image/gif;base64,' + base64;
+  };
+
+  //---------------------------------------------------------------------
+  // returns qrcode function.
+
+  return qrcode;
+}();
+
+// multibyte support
+!function() {
+
+  qrcode.stringToBytesFuncs['UTF-8'] = function(s) {
+    // http://stackoverflow.com/questions/18729405/how-to-convert-utf8-string-to-byte-array
+    function toUTF8Array(str) {
+      var utf8 = [];
+      for (var i=0; i < str.length; i++) {
+        var charcode = str.charCodeAt(i);
+        if (charcode < 0x80) utf8.push(charcode);
+        else if (charcode < 0x800) {
+          utf8.push(0xc0 | (charcode >> 6),
+              0x80 | (charcode & 0x3f));
+        }
+        else if (charcode < 0xd800 || charcode >= 0xe000) {
+          utf8.push(0xe0 | (charcode >> 12),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+        // surrogate pair
+        else {
+          i++;
+          // UTF-16 encodes 0x10000-0x10FFFF by
+          // subtracting 0x10000 and splitting the
+          // 20 bits of 0x0-0xFFFFF into two halves
+          charcode = 0x10000 + (((charcode & 0x3ff)<<10)
+            | (str.charCodeAt(i) & 0x3ff));
+          utf8.push(0xf0 | (charcode >>18),
+              0x80 | ((charcode>>12) & 0x3f),
+              0x80 | ((charcode>>6) & 0x3f),
+              0x80 | (charcode & 0x3f));
+        }
+      }
+      return utf8;
+    }
+    return toUTF8Array(s);
+  };
+
+}();
+
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+      define([], factory);
+  } else if (typeof exports === 'object') {
+      module.exports = factory();
+  }
+}(function () {
+    return qrcode;
+}));
+
+</script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const SECRET_OPEN={{SECRET_OPEN}};
+const DEF={tab:'gen',bpm:80,grids:{1:false,2:true,4:true,3:false,6:false,L:false},level:3,num:4,den:4,bars:4,repeats:1,clickOn:true,noteSound:true,countIn:true,showCount:false,restLvl:0,ties:false,sextCount:'mix',
+  mBeats:4,mSub:1,mAcc:[2,1,1,1],gapOn:false,gapPlay:2,gapMute:2,trStart:80,trMax:140,trStep:5,trMode:'bars',trBars:4,trSec:30,
+  clockMode:'watch',timerSec:300,songs:[],clickSnd:'pro',trPresets:[],trLoaded:null,songLoaded:null,genPresets:[],genLoaded:null,uiSnd:true,vol:90,mute:false,sinkId:'',
+  tapOn:false,tapCal:0,fmClean:false,fmRec:true,fmLay:'half',fmBars:4,fmFacing:'user',hpLag:null,fmCam:true,fmMic:true,fmTitle:'תצליח לקרוא את זה ב־{BPM} BPM?',fmHandle:'@nivdrums',fmEnd:'הגעת עד הסוף? תכתוב לי בתגובות 👇',fmMode:'lvl',fmRounds:5,fmCount:true,fmStep:10,clkClick:true,clkStopClick:true,dynOn:false,stick:false,dynAuto:true,dynLvl:1,mode:'path',trkD:true,trkT:false,manual:['4:1000','4:1010','4:0000','4:0010','4:1111']};
+var RC={applying:false,remoteMode:false,peer:false,connected:false,paired:false,phoneName:'',live:null};
+let onSave=null;
+let S=Object.assign({},DEF);
+var WH={};
+try{const s=JSON.parse(localStorage.getItem('chartready')||localStorage.getItem('nivbot2')||'null');if(s)S=Object.assign(S,s,{grids:Object.assign({},DEF.grids,s.grids||{})});}catch(e){}
+if(S.tab==='set') S.tab='gen';
+const save=()=>{try{localStorage.setItem('chartready',JSON.stringify(S))}catch(e){} if(onSave) onSave();};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const fmt=s=>{s=Math.max(0,Math.round(s)); const p=n=>String(n).padStart(2,'0'); return s>=3600?`${Math.floor(s/3600)}:${p(Math.floor(s/60)%60)}:${p(s%60)}`:`${Math.floor(s/60)}:${p(s%60)}`;};
+function fitAcc(){ const a=(S.mAcc||[]).slice(0,S.mBeats); while(a.length<S.mBeats) a.push(a.length?1:2); S.mAcc=a; }
+fitAcc();
+
+{{GEN}}
+{{NOTA}}
+{{AUDIO}}
+// small interface sounds (dial ticks, keypad, beat preview); quiet and optional
+function ui(fn){ if(!S.uiSnd) return; if(!ctx){ initAudio().then(()=>{ try{fn(ctx.currentTime+0.01);}catch(e){} }); return; } if(ctx.state!=='running') ctx.resume(); try{ fn(ctx.currentTime+0.005); }catch(e){} }
+const uiTick=()=>ui(t=>noiseHit(t,4200,2,0.012,0.22));
+const uiKey=()=>ui(t=>tone(t,880,0.03,0.09));
+const uiStep=t=>{ if(!S.uiSnd||!ctx) return; tone(t,660,0.09,0.1); tone(t+0.08,990,0.12,0.1); };
+function bell(){
+  if(!ctx) return; const t=ctx.currentTime+0.03;
+  // "ding-dong" twice: each note has inharmonic bell partials and a long ring
+  [[0,1318.5],[0.38,1046.5],[1.1,1318.5],[1.48,1046.5]].forEach(([d,f])=>[[1,0.32,2.2],[2.756,0.12,1.2],[5.404,0.05,0.6],[0.5,0.08,2.6]].forEach(([m,v,len])=>{
+    const o=ctx.createOscillator(), g=ctx.createGain(); o.type='sine'; o.frequency.value=f*m;
+    g.gain.setValueAtTime(0.0001,t+d); g.gain.exponentialRampToValueAtTime(v,t+d+0.006); g.gain.exponentialRampToValueAtTime(0.0001,t+d+len);
+    o.connect(g).connect(BUS.bell||master); o.start(t+d); o.stop(t+d+len+0.05); }));
+}
+
+/* ---------- scheduler ---------- */
+let playing=false, timer=null, cur=null, barN=0, visQ=[], wake=null, trT0=0, trStepNow=-1;
+const AHEAD=0.12;
+function barClicks(r,off,ev,extra){
+  let u=0;
+  groupsFor(r.num,r.den).forEach((k,gi)=>{ for(let j=0;j<k;j++) ev.push(Object.assign({b:off+u+j,type:'click',kind:j?'sub':(gi===0?'acc':'beat')},extra&&extra(u+j))); u+=k; });
+}
+function genEvents(r){
+  const ev=[];
+  r.bars.forEach((beats,b)=>{
+    const off=b*r.num; barClicks(r,off,ev);
+    let u=0; const TPU=r.den===4?12:6;
+    beats.forEach(bt=>{ bt.slots.forEach((h,i)=>{ if(h){ const tk=Math.round((u+i*bt.k/bt.g)*TPU); ev.push({b:off+u+i*bt.k/bt.g,type:'note',id:`n${b}_${tk}`,dur:bt.k/bt.g,acc:!!(beats.acc&&beats.acc.includes(tk))}); } }); u+=bt.k; });
+  });
+  return ev.sort((a,b)=>a.b-b.b);
+}
+function makeLoop(kind,start){
+  const bd=60/S.bpm;
+  if(kind==='count'){ const ev=[]; barClicks(rhythm,0,ev,u=>({count:u+1})); return {kind,start,bd,len:rhythm.num,ev,idx:0}; }
+  return {kind,start,bd,len:rhythm.bars.length*rhythm.num,ev:genEvents(rhythm),idx:0,r:rhythm};
+}
+// metronome and trainer play one beat at a time, so a tempo change lands on the next beat
+function makeBeat(start,beat){
+  const bd=60/S.bpm, a=S.mAcc[beat]!=null?S.mAcc[beat]:1, cyc=S.gapPlay+S.gapMute, gapm=S.tab!=='tr'&&S.gapOn&&(barN%cyc)>=S.gapPlay;
+  const ev=[];
+  for(let j=0;j<S.mSub;j++) ev.push({b:j/S.mSub,type:'click',kind:j?'sub':(a===2?'acc':'beat'),muted:gapm||a===0,beat:j?null:beat});
+  return {kind:'beat',start,bd,len:1,ev,idx:0,beat,gapm,silent:gapm||a===0};
+}
+function nextLoop(){
+  const start=cur.start+cur.len*cur.bd;
+  if(S.tab==='gen'){
+    if(FILM.run){ filmNextLoop(start); return; }
+    let rep=0;
+    if(cur.kind==='gen'){
+      if(cur.next){ const r=cur.next; rhythm=r; if(!cur.swapped) visQ.push({t:start,fn:()=>{clearPreview();render(r);}}); }
+      else rep=cur.rep+1;
+    }
+    beginGenLoop(start,rep); return;
+  }
+  let beat=cur.beat+1;
+  if(beat>=S.mBeats){ beat=0; barN++; }
+  if(S.tab==='tr'){ const P=trPlan(); const st=trStepAt(start,barN,beat,P);
+    if(st.done){ cur={kind:'end',start,bd:1,len:0,ev:[],idx:0}; visQ.push({t:start,fn:finishTrainer}); return; }
+    if(P.list[st.i]!==S.bpm){ setBpm(P.list[st.i]); uiStep(start); }
+    const nb=makeBeat(start,beat); cur=nb;
+    visQ.push({t:start,fn:()=>trProgress(st,P,start)});
+  } else cur=makeBeat(start,beat);
+  pushBeatUI(cur);
+}
+// a silent beat lights nothing, so the player cannot follow the light instead of counting
+function pushBeatUI(c){ const k=c.silent?-1:c.beat, g=c.gapm, gi=S.gapOn?barN%(S.gapPlay+S.gapMute):-1; visQ.push({t:c.start,fn:()=>{ gapStripNow(gi); document.querySelectorAll('#cols .col').forEach((el,i)=>el.classList.toggle('on',i===k)); $('cols').classList.toggle('ghost',g); gapBadge(g); }}); }
+function gapBadge(mute){ const b=$('gapBadge'); b.hidden=!(S.gapOn&&S.tab==='met'); b.classList.toggle('mute',!!mute); b.textContent=mute?'שקט · תמשיך לספור':`הפסקות · ${S.gapPlay}+${S.gapMute}`; }
+function beginGenLoop(start,rep){
+  cur=makeLoop('gen',start); cur.rep=rep;
+  if(FILM.run&&rep===0) filmMark('play',start);
+  const Lp=cur, n=Lp.r.bars.length, bl=Lp.r.num*Lp.bd;
+  for(let b=0;b<n;b++) visQ.push({t:start+b*bl,fn:()=>setCurBar(b,n,rep)});
+  if(FILM.run) visQ.push({t:start,fn:()=>{$('fCd').hidden=true;}});
+  if(rep>0&&tapOnNow()) visQ.push({t:start,fn:()=>document.querySelectorAll('.n.tg,.n.ty,.n.tx').forEach(e=>e.classList.remove('tg','ty','tx'))});
+  if(S.repeats>0&&rep+1>=S.repeats&&!FILM.run&&!Lp.r.pinned) planNext(Lp);
+}
+function planNext(Lp){
+  if(Lp.next) return;
+  const nx=genRhythm(), n=Lp.r.bars.length, bl=Lp.r.num*Lp.bd;
+  Lp.next=nx;
+  if(nx.bars.length!==n) return;
+  Lp.swapped=true;
+  if(n===1){ visQ.push({t:0,fn:()=>showPreview(nx)}); visQ.push({t:Lp.start+bl,fn:()=>{clearPreview();swapBar(0,nx);}}); }
+  else for(let b=0;b<n;b++) visQ.push({t:Lp.start+(b+1)*bl,fn:()=>swapBar(b,nx)});
+}
+function requestNew(){
+  if(RC.remoteMode){ rsend({k:'cmd',c:'new'}); return; }
+  if(!playing||!cur||cur.kind==='count'){ rhythm=genRhythm(); clearPreview(); render(); return; }
+  if(cur.kind==='gen') planNext(cur);
+}
+/* trainer */
+function trPlan(){
+  const down=S.trMax<S.trStart, span=Math.abs(S.trMax-S.trStart), n=Math.ceil(span/S.trStep), list=[];
+  for(let i=0;i<=n;i++) list.push(down?Math.max(S.trMax,S.trStart-i*S.trStep):Math.min(S.trMax,S.trStart+i*S.trStep));
+  const durs=list.map(b=>S.trMode==='bars'?S.trBars*S.mBeats*60/b:S.trSec);
+  return {list,durs,total:durs.reduce((a,b)=>a+b,0),up:span>0,ok:span>0,down};
+}
+function trStepAt(t,bar,beat,P){
+  if(S.trMode==='bars'){ const i=Math.floor(bar/S.trBars); if(i>=P.list.length) return {done:true}; return {i,frac:((bar%S.trBars)+beat/S.mBeats)/S.trBars}; }
+  const el=t-trT0, i=Math.floor(el/S.trSec+1e-6); if(i>=P.list.length) return {done:true}; return {i,frac:(el-i*S.trSec)/S.trSec};
+}
+let trLive=null;
+function trProgress(st,P,t){ trLive={i:st.i,frac:st.frac,t,bpm:P.list[st.i]}; }
+function finishTrainer(){ stop(); trStepNow=-1; bell(); toast('סיימת את התרגיל'); }
+function drawTrainer(live){
+  const P=trPlan(), n=P.list.length, svg=$('trChart'), W=Math.max(200,Math.round(svg.clientWidth||340)), H=Math.max(100,Math.round(svg.clientHeight||200)), top=20, base=H-4;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  if(!P.ok){ svg.innerHTML=`<text x="${W/2}" y="${H/2}" class="stl" style="font-size:13px">ההתחלה והיעד זהים</text>`; return; }
+  const gap=n>24?2:4, w=(W-gap*(n-1))/n, every=Math.ceil(n/7), lo=Math.min(S.trStart,S.trMax), hi=Math.max(S.trStart,S.trMax);
+  let s='<defs><linearGradient id="stg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#2a2e35"/><stop offset="1" stop-color="#1b1e23"/></linearGradient></defs>';
+  P.list.forEach((b,i)=>{
+    const h=16+(base-top-16)*((b-lo)/Math.max(1,hi-lo)), x=i*(w+gap), y=base-h;
+    const state=live?(i<live.i?'done':i===live.i?'now':''):'';
+    s+=`<rect class="stp ${state||'idle'}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4"/>`;
+    if(state==='now') s+=`<rect class="stpfill" x="${x.toFixed(1)}" y="${(y+h*(1-clamp(live.frac,0,1))).toFixed(1)}" width="${w.toFixed(1)}" height="${(h*clamp(live.frac,0,1)).toFixed(1)}" rx="4"/>`;
+    if(i%every===0||i===n-1||state==='now') s+=`<text class="stl${state==='now'?' now':''}" x="${(x+w/2).toFixed(1)}" y="${(y-5).toFixed(1)}">${b}</text>`;
+  });
+  svg.innerHTML=s;
+}
+function trTick(){
+  if(!playing||S.tab!=='tr'||!trLive) return;
+  const P=trPlan(); let frac=trLive.frac, left;
+  const now=ctx.currentTime;
+  if(S.trMode==='time'){ const el=now-trT0; frac=(el-trLive.i*S.trSec)/S.trSec; left=S.trSec-(el-trLive.i*S.trSec); }
+  else { const beatsLeft=(1-frac)*S.trBars*S.mBeats; left=beatsLeft*60/trLive.bpm-(now-trLive.t); frac=frac+(now-trLive.t)/(S.trBars*S.mBeats*60/trLive.bpm); }
+  trLast={i:trLive.i,frac}; drawTrainer(trLast);
+  const last=trLive.i===P.list.length-1;
+  $('trBig').textContent=trLive.bpm; $('trStepL').textContent=`שלב ${trLive.i+1}/${P.list.length} · BPM`;
+  $('trMain').textContent=`⁦${trLive.bpm} BPM⁩`;
+  const rest=left+P.durs.slice(trLive.i+1).reduce((a,b)=>a+b,0); $('trSum').textContent=`נשאר ${fmt(rest)}`; $('trEl').textContent=fmt(now-trT0);
+  let when;
+  if(S.trMode==='bars'){ const b=Math.max(1,Math.ceil((1-clamp(frac,0,1))*S.trBars-1e-6)); when=b===1?'בעוד תיבה אחת':`בעוד ${b} תיבות`; }
+  else { const sc=Math.max(1,Math.ceil(left-1e-6)); when=sc===1?'בעוד שנייה אחת':`בעוד ${sc} שניות`; }
+  $('trSub').textContent=last?`שלב אחרון · נשאר ${fmt(left)}`:`${P.down?'↓':'↑'} ⁦${P.list[trLive.i+1]} BPM⁩ ${when}`;
+}
+function trIdle(){ const P=trPlan(); drawTrainer(null); $('trInfo').hidden=true; $('trBig').textContent=S.trStart; $('trStepL').textContent=P.ok?`${P.list.length} שלבים · BPM`:'BPM'; $('trSub').textContent=P.ok?`${P.down?'↘':'↗'} עד ⁦${S.trMax} BPM⁩`:''; $('trEl').textContent=''; trIdleQuiet(); }
+/* practice clock: runs only when started from its popup, independent of the metronome */
+const clk={on:false,acc:0,from:0};
+const clkNow=()=>clk.acc+(clk.on?(performance.now()-clk.from)/1000:0);
+function clockStart(){ if(clk.on) return; clk.on=true; clk.from=performance.now(); clockLoop(); clockTick(); }
+function clockStop(){ if(!clk.on) return; clk.acc=clkNow(); clk.on=false; clockTick(); }
+function clockLoop(){ if(!clk.on) return; clockTick(); setTimeout(clockLoop,250); }
+async function clockDone(){ clockStop(); clk.acc=0; if(playing&&S.clkStopClick) stop(); try{ await initAudio(); }catch(e){} bell(); toast('סיימת את זמן התרגול'); clockTick(); }
+function clockTick(){
+  const t=clkNow(), timerMode=S.clockMode==='timer', shownT=timerMode?Math.max(0,S.timerSec-t):t;
+  $('clockPillT').textContent=fmt(shownT); $('clockPillGT').textContent=fmt(shownT); $('clockShow').textContent=fmt(shownT);
+  ['clockPill','clockPillG'].forEach(id=>{ $(id).classList.toggle('run',clk.on); $(id).classList.toggle('dim',!clk.on&&t===0); });
+  { const f=timerMode?clamp(1-t/S.timerSec,0,1):1; $('clockDrain').style.strokeDashoffset=String(100-100*f); $('clockPillL').textContent=timerMode?'⏱ טיימר':'⏱ סטופר'; }
+  $('clockGo').textContent=clk.on?'עצור':(t>0?'המשך':'הפעל');
+  $('clockReset').hidden=timerMode; $('clkStopRow').hidden=!timerMode;
+  // in timer mode the chosen time is already in the steppers; the big clock only appears once it counts
+  $('clockShow').hidden=timerMode&&!clk.on&&t===0;
+  $('timerVal').textContent=fmt(S.timerSec);
+  if(timerMode&&clk.on&&t>=S.timerSec) clockDone();
+}
+function sched(){
+  while(true){
+    if(cur.kind==='end') break;
+    if(cur.idx>=cur.ev.length){ nextLoop(); if(cur.kind==='end') break; }
+    const e=cur.ev[cur.idx], t=cur.start+e.b*cur.bd;
+    if(t>ctx.currentTime+AHEAD) break;
+    cur.idx++;
+    if(e.type==='click'){
+      const silent=cur.kind==='beat'?e.muted:!S.clickOn;
+      if(!silent) click(t,e.kind);
+      if(FILM.recOn&&e.kind!=='sub'&&cur.kind==='gen') filmMark('beat',t);
+      if(e.count) visQ.push({t,fn:()=>{$('liveMain').textContent=`ספירה ${e.count}`;$('liveSub').textContent=`\u2066${S.bpm} BPM\u2069`;}});
+      if(e.count&&FILM.run){ const k=cur.len-e.count+1; visQ.push({t,fn:()=>filmCount(k)}); }
+    } else {
+      if(S.noteSound) snare(t,e.acc);
+      const id=e.id, off=t+Math.min(0.16,e.dur*cur.bd*0.9);
+      if(cur.kind==='gen'&&tapOnNow()){ const bi=Math.floor(e.b/cur.r.num+1e-9), bl=cur.r.num*cur.bd; tapExpect(t,id,cur.start.toFixed(3)+'_'+bi,cur.start+bi*bl,cur.start+(bi+1)*bl); }
+      visQ.push({t,fn:()=>{const el=$(id); if(el) el.classList.add('on'); const c=$('c'+id); if(c) c.classList.add('now');}});
+      visQ.push({t:off,fn:()=>{const el=$(id); if(el) el.classList.remove('on'); const c=$('c'+id); if(c) c.classList.remove('now');}});
+    }
+  }
+}
+let lastTick=0;
+function frame(){
+  if(!playing) return;
+  const now=ctx.currentTime, due=[];
+  visQ=visQ.filter(v=>{ if(v.t<=now){due.push(v);return false;} return true; });
+  due.sort((a,b)=>a.t-b.t).forEach(v=>v.fn());
+  if(now-lastTick>0.2){ lastTick=now; trTick(); }
+  if(tapOnNow()) tapSweep();
+  if(FILM.run) filmProg();
+  if(playing) requestAnimationFrame(frame);
+}
+const PLAY='<path d="M8 5.5v13l11-6.5z" fill="currentColor"/>', STOP='<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/>';
+function setPlayingUI(on){
+  $('live').hidden=!(on&&S.tab==='gen');
+  requestAnimationFrame(fitScore);
+  $('playIcon').innerHTML=on?STOP:PLAY; $('playL').textContent=on?'עצור':'נגן';
+  $('play').setAttribute('aria-label',on?'עצור':'נגן'); $('screen').classList.toggle('playing',on);
+  $('tabSet').classList.toggle('off',on);
+  $('screen').classList.toggle('lock',on);
+}
+async function start(){
+  await initAudio(); applyVol();
+  playing=true; barN=0; visQ=[]; cur=null; trLive=null;
+  const t0=ctx.currentTime+0.12;
+  setPlayingUI(true);
+  if(S.tab==='gen'){
+    $('liveMain').textContent='מתחיל…'; $('liveSub').textContent='';
+    clearPreview();
+    if(!rhythm){rhythm=genRhythm();render();}
+    tapReset(); histStart();
+    if(FILM.run?S.fmCount:S.countIn) cur=makeLoop('count',t0); else beginGenLoop(t0,0);
+  } else {
+    if(S.tab==='tr'){ const P=trPlan(); if(!P.up){ stop(); return; } setBpm(P.list[0]); trT0=t0; trProgress({i:0,frac:0},P,t0); $('trInfo').hidden=false; }
+    cur=makeBeat(t0,0); pushBeatUI(cur);
+  }
+  timer=setInterval(sched,25); sched(); requestAnimationFrame(frame);
+  try{ if(navigator.wakeLock) wake=await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function stop(){
+  if(!playing) return;
+  playing=false; clearInterval(timer); visQ=[];
+  // keep exactly what is on screen so an odd bar can be studied; play resumes from these bars
+  if(rhythm&&shown.length) rhythm={bars:shown.slice(),num:rhythm.num,den:rhythm.den,pinned:rhythm.pinned};
+  histStop();
+  document.querySelectorAll('.barbox.cur,#cols .col.on').forEach(e=>e.classList.remove('cur','on'));
+  $('cols').classList.remove('ghost'); gapBadge(false);
+  document.querySelectorAll('.n.on').forEach(e=>e.classList.remove('on'));
+  document.querySelectorAll('.cnt.now').forEach(e=>e.classList.remove('now'));
+  setPlayingUI(false); updateQuick();
+  if(S.tab==='tr') trIdle();
+  try{ wake&&wake.release(); }catch(e){} wake=null;
+  if(tapOnNow()) tapSummary();
+  if(S.clkClick&&clk.on) clockStop();
+  if(FILM.run) filmStopped();
+}
+function toggle(){ if(RC.remoteMode){ rsend({k:'cmd',c:'toggle'}); return; } playing?stop():start(); }
+const isPlaying=()=>playing||!!(RC.remoteMode&&RC.live&&RC.live.playing);
+{{FILM}}
+{{EDITOR}}
+
+/* ---------- UI ---------- */
+const FILMBTN=true;
+const SECRET_MSGS={1:'סיסמה שגויה',3:'עדיין לא 🙂',5:'רמז: תשאל את המורה שלך 🥁',7:'ממש לא 😄',10:'אתה עקשן. זה טוב בשביל מתופף. עכשיו לך לתרגל'};
+function secretAsk(){
+  let n=0; try{ n=+localStorage.getItem('cr_tries')||0; }catch(e){}
+  openKeypad({title:'🔒 סודי',secret:true,pin:6,maxLen:6,onOk:v=>{
+    if(SECRET_OPEN){ RCS.unlocked=true; rcSave(); rcUI(); toast('סודי נפתח'); return true; }
+    n++; try{ localStorage.setItem('cr_tries',n); }catch(e){}
+    const keys=Object.keys(SECRET_MSGS).map(Number).filter(k=>k<=n); $('kpHint').textContent=SECRET_MSGS[Math.max(...keys)];
+    return false; }});
+  $('kpHint').textContent='הקש סיסמה';
+}
+const TP={typing:false,val:'',tapMode:false};
+const SUBN={1:'רבעים',2:'שמיניות',3:'טריולות',4:'שש־עשריות',6:'סקסטולות'};
+const TEMPO_NAMES=[[20,'Larghissimo'],[40,'Grave'],[60,'Largo'],[66,'Larghetto'],[76,'Adagio'],[108,'Andante'],[120,'Moderato'],[156,'Allegro'],[176,'Vivace'],[200,'Presto'],[999,'Prestissimo']];
+const tempoName=b=>TEMPO_NAMES.find(([m])=>b<m)[1];
+let toastT=null;
+// toast(msg) = quick note at the top; toast(msg,{act,label,ico,bottom,ms}) = note with an action button at the bottom
+function toast(msg,o){ o=o||{}; const t=$('toast'); clearTimeout(toastT);
+  t.className='toast'+(o.bottom||o.act?' bot':''); t.innerHTML='';
+  const ic=document.createElement('span'); ic.className='tc'; ic.textContent=o.ico||'✓'; if(o.icoBg){ ic.style.background=o.icoBg; ic.style.color=o.icoFg||'#fff'; } if(o.ico!==null) t.appendChild(ic);
+  const m=document.createElement('span'); m.textContent=msg; t.appendChild(m);
+  if(o.act){ const u=document.createElement('button'); u.className='undo'; u.textContent=o.label||'ביטול'; u.onclick=e=>{ e.stopPropagation(); t.hidden=true; o.act(); }; t.appendChild(u); }
+  if(o.bar){ const tb=document.createElement('span'); tb.className='tb'; tb.innerHTML='<i></i>'; t.appendChild(tb); }
+  t.hidden=false; toastT=setTimeout(()=>t.hidden=true,o.ms||(o.act?5000:2600)); }
+function FRAC(n,d){ return `<span class="frac"><i>${n}</i><i>${d}</i></span>`; }
+var SNDN={pro:'מקצועי',wood:'בלוק עץ',sticks:'מקלות'};
+function vizDots(n,acc){ n=Math.min(n,8); return `<span class="viz vdots">${[...Array(n)].map((_,i)=>`<i class="${(acc?acc[i]===2:i===0)?'a':''}"></i>`).join('')}</span>`; }
+function updateQuick(){
+  $('qDyn').textContent=S.dynOn?`שלב ${dynStage()}`:'כבוי'; $('qDyn').className=S.dynOn?'hot':'off'; syncPresets();
+  $('vDyn').innerHTML=`<span style="color:${S.dynOn?'var(--accent)':'#5b636d'};letter-spacing:2px">&gt; · &gt;</span>`;
+  $('qMeter').innerHTML=FRAC(S.num,S.den); $('vMeter').outerHTML=vizDots(S.num).replace('class="viz','id="vMeter" class="viz');
+  $('qBars').textContent=S.bars; $('vBars').className='viz vsegs'+(S.bars>8?' many':''); $('vBars').innerHTML='<i></i>'.repeat(Math.min(S.bars,12));
+  const man=(S.mode||'free')==='manual', L=S.level; $('qLevel').textContent=man?'ידני':L; $('qLevel').className=man?'':'hot';
+  $('vLevel').className='viz vfire'; $('vLevel').innerHTML=[...Array(5)].map((_,i)=>`<i class="${!man&&i<Math.ceil(L/2)?'on':''}" style="height:${30+i*17}%;--c:${LVL_C[Math.min(9,i*2+1)]}"></i>`).join('');
+  $('qBpm').textContent=S.bpm; $('qTempo').textContent=tempoName(S.bpm).toUpperCase();
+  $('mMeterBtn').innerHTML=FRAC(S.mBeats,4); $('vMBeats').outerHTML=vizDots(S.mBeats,S.mAcc).replace('class="viz','id="vMBeats" class="viz');
+  $('qMSub').textContent=SUBN[S.mSub]; $('vMSub').innerHTML=SUBI[S.mSub];
+  $('qGap').textContent=S.gapOn?`${S.gapPlay}+${S.gapMute}`:'כבוי'; $('qGap').className=S.gapOn?'hot':'off';
+  $('vGap').innerHTML=`<span class="viz vdots" style="height:auto">${[...Array(4)].map((_,i)=>`<i class="${S.gapOn&&i<2?'a':''}"></i>`).join('')}</span>`;
+  $('qSnd').textContent=SNDN[S.clickSnd]||'מקצועי'; $('vSnd').innerHTML=SNDI[S.clickSnd]||SNDI.pro;
+  $('qtMeter').innerHTML=FRAC(S.mBeats,4); $('vTrM').outerHTML=vizDots(S.mBeats).replace('class="viz','id="vTrM" class="viz');
+  $('qtRange').innerHTML=`<bdi dir="ltr">${S.trStart}→${S.trMax}</bdi>`; $('qtStep').innerHTML=`<bdi dir="ltr">${S.trMax<S.trStart?'−':'+'}${S.trStep}</bdi>`;
+  $('vTrT').innerHTML=`<span class="viz vfire" style="height:16px">${[...Array(5)].map((_,i)=>`<i class="on" style="height:${S.trMax<S.trStart?90-i*15:30+i*15}%;--c:var(--accent)"></i>`).join('')}</span>`;
+  $('qtWhen').textContent=S.trMode==='bars'?`${S.trBars} ${S.trBars===1?'תיבה':'תיבות'}`:fmt(S.trSec); $('vTrW').textContent=S.trMode==='bars'?'▮▮▮▮':'⏱';
+  $('bpmUnit').textContent=S.den===8&&S.tab==='gen'?'BPM לפי שמינית':'BPM לפי רבע';
+  $('gapBtn').classList.toggle('on',S.gapOn); if(!playing) gapBadge(false); presetLabels();
+  $('timerPick').hidden=S.clockMode!=='timer'; clockTick();
+  rulerDraw();
+  if(!playing&&S.tab==='tr') trIdle(); else if(!playing) trIdleQuiet();
+}
+var SNDI={pro:'<svg viewBox="0 0 24 16"><path d="M6 14L14 2M10 14L18 2" stroke="#ff6a4d" stroke-width="2" stroke-linecap="round"/></svg>',wood:'<svg viewBox="0 0 24 16"><rect x="4" y="4" width="16" height="8" rx="2" fill="none" stroke="#c99a5b" stroke-width="2"/></svg>',sticks:'<svg viewBox="0 0 24 16"><path d="M4 14L16 2M8 14L20 2" stroke="#d9c7a3" stroke-width="2.2" stroke-linecap="round"/></svg>'};
+/* BPM ruler: one tick per BPM, drag sideways to change the tempo */
+const RUL={sp:9,drag:null};
+function rulerDraw(){ const el=$('rulerTks'); if(!el||!el.offsetParent) return; const W=el.clientWidth, c=W/2, n=Math.ceil(c/RUL.sp)+1; let h='';
+  for(let i=-n;i<=n;i++){ const v=S.bpm+i; if(v<1||v>400) continue; h+=`<i class="${i===0?'c':v%5===0?'m':''}" style="left:${(c+i*RUL.sp).toFixed(1)}px"></i>`; } el.innerHTML=h; }
+(()=>{ const r=$('ruler'); let st=null;
+  r.addEventListener('pointerdown',e=>{ st={x:e.clientX,acc:0,moved:false}; r.setPointerCapture(e.pointerId); });
+  r.addEventListener('pointermove',e=>{ if(!st) return; const dx=e.clientX-st.x; st.x=e.clientX; st.acc+=dx; if(Math.abs(st.acc)>4) st.moved=true;
+    const k=Math.trunc(st.acc/RUL.sp); if(k){ st.acc-=k*RUL.sp; setBpm(S.bpm-k); uiTick(); try{ navigator.vibrate&&navigator.vibrate(2); }catch(x){} } });
+  const up=e=>{ if(!st) return; const m=st.moved; st=null; if(!m) openPop('tempo'); };
+  r.addEventListener('pointerup',up); r.addEventListener('pointercancel',()=>{st=null;});
+  window.addEventListener('resize',rulerDraw); })();
+/* tiles: tap opens the popup, sideways drag changes the value */
+let dragEat=false;
+document.addEventListener('click',e=>{ if(dragEat){ dragEat=false; e.stopPropagation(); e.preventDefault(); } },true);
+const TDRAG={meter:{get:()=>S.num,set:v=>{S.num=clamp(v,1,19); meterSync(); regen();},step:28},bars:{get:()=>S.bars,set:v=>{S.bars=clamp(v,1,32); barsSync(); regen();},step:28},
+  level:{get:()=>S.level,set:v=>lvlSet(v),step:24},mbeats:{get:()=>S.mBeats,set:v=>setMBeats(v),step:28}};
+document.querySelectorAll('.tile[data-drag]').forEach(t=>{ let st=null; const D=TDRAG[t.dataset.drag];
+  t.addEventListener('pointerdown',e=>{ if(isPlaying()) return; st={x:e.clientX,y:e.clientY,v:D.get(),on:false}; });
+  t.addEventListener('pointermove',e=>{ if(!st) return; const dx=e.clientX-st.x;
+    if(!st.on){ if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(e.clientY-st.y)){ st.on=true; t.setPointerCapture(e.pointerId); t.classList.add('drag'); } else return; }
+    const v=st.v+Math.round(-dx/D.step); if(v!==D.get()){ D.set(v); save(); updateQuick(); uiTick(); } });
+  const end=()=>{ if(st&&st.on){ dragEat=true; setTimeout(()=>dragEat=false,350); } st=null; t.classList.remove('drag'); };
+  t.addEventListener('pointerup',end); t.addEventListener('pointercancel',end); });
+/* dynamics tile: a quick tap turns it on/off, a long press opens the popup */
+(()=>{ const t=$('dynTile'); let lp=null, long=false;
+  t.addEventListener('pointerdown',()=>{ if(isPlaying()) return; long=false; lp=setTimeout(()=>{ long=true; openPop('dyn'); },480); });
+  const cl=()=>clearTimeout(lp); t.addEventListener('pointerleave',cl); t.addEventListener('pointercancel',cl);
+  t.addEventListener('pointerup',()=>{ cl(); });
+  t.addEventListener('click',()=>{ if(long||isPlaying()) return; S.dynOn=!S.dynOn; dynChanged(); toast(S.dynOn?'דינמיקה פועלת · לחיצה ארוכה להגדרות':'דינמיקה כבויה'); });
+  t.addEventListener('contextmenu',e=>e.preventDefault()); })();
+function trIdleQuiet(){ const P=trPlan(); if(S.tab==='tr'&&!playing) $('trSum').textContent=P.ok?`משך ${fmt(P.total)}`:''; if(typeof trSetUI==='function') trSetUI(); }
+function setBpm(v){
+  S.bpm=clamp(Math.round(v),1,400); if(!TP.typing) $('tpShow').textContent=S.bpm; $('tpName').textContent=tempoName(S.bpm); $('mBpm').textContent=S.bpm; $('qBpm').textContent=S.bpm; $('mName').textContent=tempoName(S.bpm).toUpperCase(); if($('qTempo')) $('qTempo').textContent=tempoName(S.bpm).toUpperCase(); drawTicks(); if(typeof rulerDraw==='function') rulerDraw(); save(); if(typeof presetLabels==='function'&&$('songBtn')) presetLabels();
+}
+$('bpmDown').onclick=()=>{ setBpm(S.bpm-5); uiTick(); };
+$('bpmUp').onclick=()=>{ setBpm(S.bpm+5); uiTick(); };
+let taps=[];
+function tapTempo(){ if(S.uiSnd&&!playing) ui(t=>click(t,'beat')); const n=performance.now(); taps=taps.filter(t=>n-t<2500); taps.push(n);
+  if(taps.length>1) setBpm(60000/((taps[taps.length-1]-taps[0])/(taps.length-1))); if(taps.length>5) taps.shift(); }
+$('mTap').onclick=tapTempo;
+/* tempo dial: 9 degrees per BPM */
+let dialAng=0, drag=null;
+function drawTicks(){
+  const rot=(S.bpm*9)%360; let s='';
+  for(let i=0;i<40;i++){ const deg=(i*9+rot)%360, a=deg*Math.PI/180, big=i%5===0, r1=46, r2=big?37:41;
+    const near=Math.min(deg,360-deg), hot=deg<=72&&deg>=0?1-deg/80:0;
+    const col=hot>0?`rgba(255,159,28,${(0.35+hot*0.65).toFixed(2)})`:(big?'#5b636d':'#2f343b');
+    s+=`<line x1="${(50+r1*Math.sin(a)).toFixed(2)}" y1="${(50-r1*Math.cos(a)).toFixed(2)}" x2="${(50+r2*Math.sin(a)).toFixed(2)}" y2="${(50-r2*Math.cos(a)).toFixed(2)}" stroke="${col}" stroke-width="${big?1.8:1.1}" stroke-linecap="round"/>`; }
+  s+=`<circle cx="50" cy="4.2" r="3.4" fill="#fff" stroke="#ff9f1c" stroke-width="1.6"/>`;
+  $('dialTicks').innerHTML=s;
+}
+const angOf=(e,el)=>{ const r=el.getBoundingClientRect(); return Math.atan2(e.clientX-(r.left+r.width/2),-(e.clientY-(r.top+r.height/2)))*180/Math.PI; };
+$('dial').addEventListener('pointerdown',e=>{ if(e.target.closest('button')) return; const el=$('dial'); el.setPointerCapture(e.pointerId); drag={a:angOf(e,el),acc:0}; });
+$('dial').addEventListener('pointermove',e=>{ if(!drag) return; const a=angOf(e,$('dial')); let d=a-drag.a; if(d>180) d-=360; if(d<-180) d+=360; drag.a=a; drag.acc+=d;
+  const steps=Math.trunc(drag.acc/9); if(steps){ drag.acc-=steps*9; setBpm(S.bpm+steps); uiTick(); try{ navigator.vibrate&&navigator.vibrate(3); }catch(e){} } });
+['pointerup','pointercancel'].forEach(ev=>$('dial').addEventListener(ev,()=>{drag=null;}));
+// one number keypad for every number on the page, so phones never need their own keyboard
+let kp=null;
+function openKeypad(o){ kp=Object.assign({val:''},o); $('kpTitle').textContent=o.title; $('kpWrap').classList.toggle('timek',!!o.time); $('kpHint').textContent=o.time?'מקלידים כמו במיקרוגל: 1 → 3 → 0 = דקה וחצי':(o.secret||o.raw)?'':`בין ${o.min} ל־${o.max}${o.unit?' '+o.unit:''}`; kpShow(!o.secret&&!o.raw); $('kpWrap').classList.add('open'); $('kpWrap').setAttribute('aria-hidden','false'); }
+function closeKeypad(){ kp=null; $('kpWrap').classList.remove('open'); $('kpWrap').setAttribute('aria-hidden','true'); }
+function kpShow(first){ if(!kp) return; const v=+kp.val; if(kp.time){ const d=kp.val.padStart(6,'0'), on=6-kp.val.length; const seg=(a,b)=>[...d.slice(a,b)].map((c,i)=>`<span class="${a+i>=on?'on':''}">${c}</span>`).join(''); $('kpShow').innerHTML=`<div class="tdisp">${seg(0,2)}<i>:</i>${seg(2,4)}<i>:</i>${seg(4,6)}</div><div class="tlab"><span>שעות</span><span>דקות</span><span>שניות</span></div>`; return; } if(kp.pin){ $('kpShow').innerHTML=`<span class="pin">${[...Array(kp.pin)].map((_,i)=>`<i class="${i<kp.val.length?'on':''}"></i>`).join('')}</span>`; return; } $('kpShow').textContent=first?kp.value:(kp.secret?('•'.repeat(kp.val.length)||'—'):(kp.val||'—')); $('kpShow').classList.toggle('bad',!kp.secret&&!kp.raw&&!!kp.val&&(v<kp.min||v>kp.max)); }
+function kpPress(k){ if(!kp) return;
+  if(k==='del') kp.val=kp.val.slice(0,-1);
+  else if(k==='ok'){ const v=+kp.val; if(!kp.val){ closeKeypad(); return; }
+    if(kp.secret){ const cb=kp.onOk, val=kp.val; const res=cb(val); if(res===false){ kp.val=''; kpShow(); const c=$('kpWrap').querySelector('.kpcard'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); try{ navigator.vibrate&&navigator.vibrate([30,50,30]); }catch(e){} } else closeKeypad(); return; }
+    if(kp.time){ const d=kp.val.padStart(6,'0'), sec=(+d.slice(0,2))*3600+(+d.slice(2,4))*60+(+d.slice(4,6)), cb=kp.onOk; closeKeypad(); if(sec>0) cb(sec); return; }
+    if(kp.raw){ const cb=kp.onOk, val=kp.val; closeKeypad(); cb(val); return; } if(v>=kp.min&&v<=kp.max){ const cb=kp.onOk; closeKeypad(); cb(v); } return; }
+  else if(kp.val.length<(kp.maxLen||String(kp.max).length)){ kp.val=((kp.val==='0'&&!kp.secret&&!kp.raw)||(kp.time&&!kp.val&&k==='0')?'':kp.val)+k; if(kp.pin&&kp.val.length===kp.pin){ kpShow(); setTimeout(()=>kpPress('ok'),120); return; } }
+  kpShow(); uiKey(); try{ navigator.vibrate&&navigator.vibrate(4); }catch(e){} }
+$('kp').onclick=e=>{ const b=e.target.closest('[data-k]'); if(b) kpPress(b.dataset.k); };
+$('kpCancel').onclick=closeKeypad;
+$('kpWrap').addEventListener('click',e=>{ if(e.target===$('kpWrap')) closeKeypad(); });
+document.addEventListener('keydown',e=>{ if(!kp) return;
+  if(/^[0-9]$/.test(e.key)){ kpPress(e.key); e.preventDefault(); }
+  else if(e.key==='Backspace'){ kpPress('del'); e.preventDefault(); }
+  else if(e.key==='Enter'){ kpPress('ok'); e.preventDefault(); }
+  else if(e.key==='Escape'){ closeKeypad(); } },true);
+function bpmEdit(){ openKeypad({title:'טמפו',value:S.bpm,min:1,max:400,unit:'BPM',onOk:v=>setBpm(v)}); }
+// every number field opens the keypad instead of the phone keyboard
+const NUM_TITLES={num:'פעמות במשקל',bars:'מספר תיבות',mBeats:'פעמות בתיבה',gapPlay:'תיבות עם קליק',gapMute:'תיבות שקטות',trStart:'טמפו התחלה',trMax:'טמפו יעד',trStep:'BPM לכל קפיצה',trBars:'תיבות לשלב',trMin:'דקות לשלב',trSecs:'שניות לשלב',tH:'שעות',tM:'דקות',tS:'שניות'};
+document.querySelectorAll('input[type=number]').forEach(el=>{
+  el.readOnly=true; el.setAttribute('inputmode','none');
+  const kmax=(el.id==='tM'||el.id==='tS')?99:(+el.max||999);
+  el.addEventListener('click',()=>openKeypad({title:NUM_TITLES[el.id]||'מספר',value:el.value,min:+el.min||0,max:kmax,
+    onOk:v=>{ el.value=v; el.dispatchEvent(new Event('change')); }}));
+});
+$('mBpm').onclick=()=>openPop('tempo'); $('mBpm').onkeydown=e=>{ if(e.key==='Enter') bpmEdit(); };
+
+/* beat columns */
+function buildCols(){ fitAcc(); $('cols').innerHTML=S.mAcc.map((a,i)=>`<button class="col" data-i="${i}" data-a="${a}" aria-label="פעמה ${i+1}"><span>${i+1}</span><i></i></button>`).join(''); }
+$('cols').onclick=e=>{ const b=e.target.closest('.col'); if(!b) return; const i=+b.dataset.i; S.mAcc[i]=(S.mAcc[i]+2)%3; document.querySelectorAll(`#cols .col[data-i="${i}"]`).forEach(c=>c.dataset.a=S.mAcc[i]); save(); presetLabels(); updateQuick(); if(!playing&&S.mAcc[i]>0){ const k=S.mAcc[i]===2?'acc':'beat'; ui(t=>click(t,k)); } };
+
+function chips(id,opts,key,after){
+  const el=$(id); el.innerHTML=opts.map(o=>`<button class="chip" data-v="${o.v}">${o.t}</button>`).join('');
+  const sync=()=>el.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===String(S[key]))));
+  el.onclick=e=>{const b=e.target.closest('.chip'); if(!b) return; const v=b.dataset.v; S[key]=isNaN(+v)?v:+v; sync(); save(); updateQuick(); after&&after();};
+  el._sync=sync; sync();
+}
+function bindNum(id,key,after){
+  const el=$(id); el.value=S[key];
+  el.onchange=()=>{ const v=clamp(Math.round(+el.value||+el.min),+el.min,+el.max); el.value=v; S[key]=v; save(); updateQuick(); after&&after(); };
+}
+const regen=()=>{ if(RC.remoteMode) return; requestNew(); };
+chips('repeats',[{v:1,t:'כל חזרה'},{v:2,t:'2 חזרות'},{v:4,t:'4 חזרות'},{v:0,t:'אף פעם'}],'repeats');
+function subIcon(n,beams,tup){ const w=64, xs=n===1?[w/2-4]:[...Array(n)].map((_,i)=>8+i*(w-22)/(n-1)), top=tup?11:8; let s='';
+  if(tup) s+=`<text x="${((xs[0]+xs[n-1])/2+4).toFixed(1)}" y="6" font-size="9" font-weight="700" text-anchor="middle" fill="currentColor">${tup}</text>`;
+  xs.forEach(x=>{ s+=`<ellipse cx="${x.toFixed(1)}" cy="32" rx="4.6" ry="3.4" transform="rotate(-22 ${x.toFixed(1)} 32)" fill="currentColor"/><line x1="${(x+4.2).toFixed(1)}" y1="31" x2="${(x+4.2).toFixed(1)}" y2="${top}" stroke="currentColor" stroke-width="1.5"/>`; });
+  for(let b=0;b<beams;b++) s+=`<rect x="${(xs[0]+3.5).toFixed(1)}" y="${top+b*5}" width="${(xs[n-1]-xs[0]+1.5).toFixed(1)}" height="3" fill="currentColor"/>`;
+  return `<svg viewBox="0 0 ${w} 38" aria-hidden="true">${s}</svg>`; }
+const SUBI={1:subIcon(1,0),2:subIcon(2,1),3:subIcon(3,1,3),4:subIcon(4,2),6:subIcon(6,2,6)};
+chips('mSub',[1,2,3,4,6].map(v=>({v,t:`${SUBI[v]}`})),'mSub'); $('mSub').querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-label',SUBN[b.dataset.v]));
+chips('sextCount',[{v:'mix',t:'מעורב'},{v:'num',t:'1 עד 6'},{v:'eighth',t:'רק שמיניות'}],'sextCount',()=>{ if(rhythm) render(); });
+chips('trMode',[{v:'bars',t:'לפי תיבות'},{v:'time',t:'לפי זמן'}],'trMode',()=>trSetUI());
+chips('clockMode',[{v:'watch',t:'סטופר'},{v:'timer',t:'טיימר'}],'clockMode',()=>{ clockStop(); clk.acc=0; clockTick(); });
+
+// meter
+const meterSync=()=>{ $('num').value=S.num; $('den').value=S.den; if(WH.num){ WH.num.set(S.num); WH.den.set(S.den); } $('meterPresets').querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===`${S.num}/${S.den}`))); };
+$('meterPresets').innerHTML=['2/4','3/4','4/4','5/4','6/8','7/8','9/8','12/8'].map(v=>`<button class="chip" data-v="${v}">${FRAC(...v.split('/'))}</button>`).join('');
+$('meterPresets').onclick=e=>{const b=e.target.closest('.chip'); if(!b) return; const [n,d]=b.dataset.v.split('/').map(Number); S.num=n; S.den=d; meterSync(); save(); updateQuick(); regen();};
+$('num').onchange=()=>{S.num=clamp(Math.round(+$('num').value||4),1,19); meterSync(); save(); updateQuick(); regen();};
+$('den').onchange=()=>{S.den=+$('den').value; meterSync(); save(); updateQuick(); regen();};
+meterSync();
+// bars
+$('barPresets').innerHTML=[1,2,4,8].map(v=>`<button class="chip" data-v="${v}">${v}</button>`).join('');
+const barsSync=()=>{ $('bars').value=S.bars; if(WH.bars){ WH.bars.set(S.bars); bsqDraw(); } $('barPresets').querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.bars))); };
+$('barPresets').onclick=e=>{const b=e.target.closest('.chip'); if(!b) return; S.bars=+b.dataset.v; barsSync(); save(); updateQuick(); regen();};
+$('bars').onchange=()=>{S.bars=clamp(Math.round(+$('bars').value||1),1,32); barsSync(); save(); updateQuick(); regen();};
+barsSync();
+// metronome beats
+$('mBeatPresets').innerHTML=[2,3,4,5,6,7,8].map(v=>`<button data-v="${v}">${v}</button>`).join('')+'<button class="more" data-v="more" aria-label="מספר אחר">…</button>';
+const mbSync=()=>{ $('mBeats').value=S.mBeats; if(WH.mb) WH.mb.set(S.mBeats); const odd=S.mBeats<2||S.mBeats>8; $('mBeatPresets').querySelectorAll('button').forEach(b=>{ const m=b.dataset.v==='more'; b.setAttribute('aria-pressed',String(m?odd:+b.dataset.v===S.mBeats)); if(m) b.textContent=odd?S.mBeats:'…'; }); };
+const setMBeats=v=>{ S.mBeats=clamp(Math.round(v),1,19); mbSync(); buildCols(); save(); updateQuick(); };
+$('mBeatPresets').onclick=e=>{const b=e.target.closest('button'); if(!b) return; if(b.dataset.v==='more') openKeypad({title:'פעמות בתיבה',value:S.mBeats,min:1,max:19,onOk:setMBeats}); else setMBeats(+b.dataset.v);};
+$('mBeats').onchange=()=>{S.mBeats=clamp(Math.round(+$('mBeats').value||4),1,19); mbSync(); buildCols(); save(); updateQuick();};
+mbSync();
+
+const PRESETS=[['בסיס',[1,2]],['16-ות',[1,2,4]],['משולשים',[1,3,6,'L']],['מעורב',[2,4,3]],['הכל',[1,2,4,3,6,'L']]];
+function selGrids(){ return [1,2,4,3,6,'L'].filter(g=>S.grids[g]); }
+function styleName(){
+  const g=selGrids(), has=x=>g.includes(x), tri=has(3)||has(6)||has('L'), str=has(2)||has(4);
+  if(g.length===6) return 'הכל';
+  if(tri&&str) return 'מעורב';
+  if(tri) return 'משולשים';
+  if(has(4)) return '16-ות';
+  return 'בסיס';
+}
+$('presets').innerHTML=PRESETS.map(([n],i)=>`<button class="chip" data-p="${i}">${n}</button>`).join('');
+function syncPresets(){ const c=selGrids().map(String).sort().join(); $('presets').querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(PRESETS[+b.dataset.p][1].map(String).sort().join()===c))); }
+$('presets').onclick=e=>{const b=e.target.closest('.chip'); if(!b) return; const set=PRESETS[+b.dataset.p][1];
+  [1,2,4,3,6,'L'].forEach(g=>S.grids[g]=set.includes(g)); syncGrids(); save(); updateQuick(); regen();};
+const gEl=$('grids');
+const syncGrids=()=>gEl.querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(!!S.grids[b.dataset.g])));
+gEl.onclick=e=>{const b=e.target.closest('.chip'); if(!b) return; const g=b.dataset.g;
+  S.grids[g]=!S.grids[g]; if(!Object.values(S.grids).some(Boolean)) S.grids[g]=true; syncGrids(); save(); updateQuick(); regen();};
+syncGrids();
+const restName=v=>v<=0?'מקצוען':v>=100?'חובבן':'מעורב';
+
+$('level').value=S.level; $('levelOut').textContent=S.level;
+// vertical "fire" slider: bottom = easiest, top = pro; heats up toward red and glows at the top
+const LVL_C=['#ffd29a','#ffc27a','#ffb347','#ffa63a','#ff9f1c','#ff8a1c','#ff7a1c','#ff6a2a','#ff4a1f','#ff2a10'];
+const LVL_N=['מתחיל','מתחיל','בסיסי','בסיסי','בינוני','בינוני','מתקדם','מתקדם','קשה','מקצוען'];
+function lvlUI(v){ v=clamp(Math.round(v),1,10); const h=(v-1)/9, box=$('lvlBox');
+  box.style.setProperty('--c',LVL_C[v-1]); box.style.setProperty('--heat',h.toFixed(3)); box.classList.toggle('hot',v>=9);
+  $('lvlFill').style.height=`calc(54px + (100% - 64px) * ${h.toFixed(3)})`; $('lvlThumb').style.bottom=`calc(32px + (100% - 64px) * ${h.toFixed(3)})`;
+  $('levelOut').textContent=v; $('levelName').textContent=LVL_N[v-1]; $('lvlTrack').setAttribute('aria-valuenow',v); }
+function lvlSet(v){ v=clamp(Math.round(v),1,10); lvlUI(v); if(v===S.level) return; S.level=v; $('level').value=v; save(); updateQuick(); regen(); }
+(()=>{ const tr=$('lvlTrack'); let drag=false, last=S.level;
+  const at=e=>{ const r=tr.getBoundingClientRect(); return 1+clamp((r.bottom-32-e.clientY)/(r.height-64),0,1)*9; };
+  tr.addEventListener('pointerdown',e=>{ drag=true; tr.setPointerCapture(e.pointerId); last=Math.round(at(e)); lvlUI(last); if(S.uiSnd) uiTick(); });
+  tr.addEventListener('pointermove',e=>{ if(!drag) return; const v=Math.round(at(e)); if(v!==last){ last=v; lvlUI(v); if(S.uiSnd) uiTick(); } });
+  const up=()=>{ if(!drag) return; drag=false; lvlSet(last); };
+  tr.addEventListener('pointerup',up); tr.addEventListener('pointercancel',up);
+  tr.addEventListener('keydown',e=>{ if(e.key==='ArrowUp'||e.key==='ArrowRight'){ e.preventDefault(); lvlSet(S.level+1); } if(e.key==='ArrowDown'||e.key==='ArrowLeft'){ e.preventDefault(); lvlSet(S.level-1); } });
+})();
+lvlUI(S.level);
+/* dynamics popup */
+$('dynSteps').innerHTML=[1,2,3,4,5,6,7].map(v=>`<button data-v="${v}">${v}</button>`).join('');
+function dynUI(){ $('dynOn').checked=!!S.dynOn; $('stickOn').checked=!!S.stick; $('dynAuto').checked=S.dynAuto!==false; $('dynBody').hidden=!S.dynOn;
+  const st=dynStage(); $('dynOut').textContent=st; $('dynName').textContent=DYN_N[st-1]+(S.dynAuto!==false?` (לפי מורכבות ${S.level})`:'');
+  $('dynSteps').classList.toggle('auto',S.dynAuto!==false); $('dynSteps').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===st))); }
+const dynChanged=()=>{ save(); updateQuick(); dynUI(); regen(); };
+$('dynOn').onchange=()=>{ S.dynOn=$('dynOn').checked; dynChanged(); };
+$('stickOn').onchange=()=>{ S.stick=$('stickOn').checked; save(); dynUI(); if(rhythm) render(); };
+$('dynAuto').onchange=()=>{ S.dynAuto=$('dynAuto').checked; if(!S.dynAuto) S.dynLvl=dynStage(); dynChanged(); };
+$('dynSteps').onclick=e=>{ const b=e.target.closest('button'); if(!b||S.dynAuto!==false) return; S.dynLvl=+b.dataset.v; dynChanged(); };
+dynUI();
+/* style modes: path (teaching ladder), free (pick subdivisions), manual (pick exact patterns) */
+const LICON=subIcon(3,0,3);
+const FREE_D=[['1','רבעים'],['2','שמיניות'],['4','שש־עשריות']], FREE_T=[['3','טריולות'],['6','סקסטולות'],['L','טריולות ארוכות']];
+const gIcon=g=>g==='L'?LICON:SUBI[g];
+function modeLabel(){ const m=S.mode||'free';
+  if(m==='path') return S.trkD!==false&&S.trkT?'שניהם':S.trkT&&S.trkD===false?'משולשים':'מרובעים';
+  if(m==='manual') return `ידני · ${(S.manual||[]).length}`;
+  return styleName(); }
+function modeUI(){
+  const m=S.mode||'free';
+  $('modeSeg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===m)));
+  $('lvlBox').hidden=m==='manual'; $('pathPart').hidden=m!=='path'; $('freePart').hidden=m!=='free'; $('manPart').hidden=m!=='manual';
+  if(m==='path'){ const d=S.trkD!==false, t=!!S.trkT||!d; $('trkD').setAttribute('aria-pressed',String(d)); $('trkT').setAttribute('aria-pressed',String(t));
+    const L=S.level, part=(on,name,D)=>on?`<div><b>${name}:</b> ${L>1?D.slice(0,L-1).join(' · ')+' · ':''}<span class="new">${L<10?'חדש: ':''}${D[L-1]}</span></div>`:'';
+    $('pathInc').innerHTML=`<b>רמה ${L} כוללת</b>`+part(d,'מרובעים',DESC_D)+part(t,'משולשים',DESC_T); }
+  if(m==='free'){ const mk=list=>list.map(([g,n])=>`<button class="gc" data-g="${g}" aria-pressed="${!!S.grids[g]}">${gIcon(g)}<small>${n}</small></button>`).join(''); $('freeD').innerHTML=mk(FREE_D); $('freeT').innerHTML=mk(FREE_T); }
+  if(m==='manual') manRender();
+}
+$('trkDIc').innerHTML=SUBI[1]+SUBI[2]+SUBI[4]; $('trkTIc').innerHTML=SUBI[3]+SUBI[6];
+$('modeSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.m===S.mode) return; S.mode=b.dataset.m; save(); updateQuick(); modeUI(); regen(); };
+const trkToggle=k=>{ const d=S.trkD!==false, t=!!S.trkT||!d; if(k==='d'){ if(d&&!t) return; S.trkD=!d; if(!S.trkD) S.trkT=true; } else { if(t&&!d) return; S.trkT=!t; } save(); updateQuick(); modeUI(); regen(); };
+$('trkD').onclick=()=>trkToggle('d'); $('trkT').onclick=()=>trkToggle('t');
+$('freePart').onclick=e=>{ const c=e.target.closest('.gc'), a=e.target.closest('.gall');
+  if(c){ const g=c.dataset.g; S.grids[g]=!S.grids[g]; if(!Object.values(S.grids).some(Boolean)) S.grids[g]=true; }
+  else if(a){ const gs=(a.dataset.cat==='d'?FREE_D:FREE_T).map(x=>x[0]), allOn=gs.every(g=>S.grids[g]); gs.forEach(g=>S.grids[g]=!allOn); if(!Object.values(S.grids).some(Boolean)) S.grids[gs[0]]=true; }
+  else return;
+  syncGrids(); save(); updateQuick(); modeUI(); regen(); };
+// manual: every pattern as a card; groups open on tap
+const MAN_G=[['d','מרובעים',p=>p.code[0]==='4'],['t','טריולות',p=>p.code[0]==='3'],['s','סקסטולות',p=>p.code[0]==='6'],['l','טריולות ארוכות',p=>p.k>1]];
+const manOpen=new Set(['d','t']);
+function manRender(){
+  const all=allPatterns().filter(p=>p.ok), on=new Set(S.manual||[]);
+  $('manCount').textContent=`${on.size} צורות נבחרו`;
+  $('manGroups').innerHTML=MAN_G.map(([k,name,f])=>{ const ps=all.filter(f), n=ps.filter(p=>on.has(p.code)).length, open=manOpen.has(k);
+    const cards=open?`<div class="pg">${ps.map((p,i)=>{ const bar=[Object.assign({},p.bt,{slots:p.bt.slots.slice()})]; bar.seed=1;
+      return `<button class="pc${p.k===2?' w2':p.k===4?' w4':''}" data-c="${p.code}" aria-pressed="${on.has(p.code)}">${svgBar(bar,'m'+k+i,{num:p.k,den:4},p.k===1?96:p.k*90,{p:0,longBroken:false})}</button>`; }).join('')}</div>`:'';
+    return `<div class="field" style="gap:6px"><div class="mgh"><button class="t" data-open="${k}">${name} <small>· ${n}/${ps.length} ${open?'▴':'▾'}</small></button><div class="mgb"><button class="gall" data-all="${k}">הכל</button><button class="gall" data-none="${k}">כלום</button></div></div>${cards}</div>`; }).join('');
+}
+$('manGroups').onclick=e=>{
+  const c=e.target.closest('.pc'), o=e.target.closest('[data-open]'), a=e.target.closest('[data-all]'), z=e.target.closest('[data-none]');
+  const set=new Set(S.manual||[]);
+  if(o){ const k=o.dataset.open; manOpen.has(k)?manOpen.delete(k):manOpen.add(k); manRender(); return; }
+  if(c){ const code=c.dataset.c; set.has(code)?set.delete(code):set.add(code); c.setAttribute('aria-pressed',String(set.has(code))); }
+  else if(a||z){ const k=(a||z).dataset.all||(a||z).dataset.none, f=MAN_G.find(x=>x[0]===k)[2]; allPatterns().filter(p=>p.ok&&f(p)).forEach(p=>a?set.add(p.code):set.delete(p.code)); }
+  else return;
+  S.manual=[...set]; save(); updateQuick(); if(a||z) manRender(); else $('manCount').textContent=`${set.size} צורות נבחרו`; clearTimeout(manRender._t); manRender._t=setTimeout(regen,350);
+};
+['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd','askDelOn'].forEach(k=>{
+  const el=$(k); el.checked=!!S[k]; el.onchange=()=>{S[k]=el.checked; save(); updateQuick(); if(k==='gapOn') gapUI(); if((k==='showCount'||k==='ties')&&rhythm) render();};
+});
+['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>bindNum(k,k));
+const secSync=()=>{ $('trMin').value=Math.floor(S.trSec/60); $('trSecs').value=S.trSec%60; if(typeof trSetUI==='function') trSetUI(); };
+['trMin','trSecs'].forEach(id=>$(id).onchange=()=>{ const m=clamp(+$('trMin').value||0,0,59), s=clamp(+$('trSecs').value||0,0,59); S.trSec=Math.max(5,m*60+s); secSync(); save(); updateQuick(); });
+secSync();
+// timer steppers and presets
+
+// with "starts the click" on, the clock and the metronome start and stop together
+function clockToggle(){ if(clk.on){ clockStop(); if(S.clkClick&&playing) stop(); } else { clockStart(); if(S.clkClick&&!playing) start(); } }
+// starting closes the popup so the metronome is in view
+$('clockGo').onclick=()=>{ const starting=RC.remoteMode?!(RC.live&&RC.live.clock&&RC.live.clock.on):!clk.on; if(RC.remoteMode) rsend({k:'cmd',c:'clock',a:'go'}); else clockToggle(); if(starting) closePop(); };
+['clkClick','clkStopClick'].forEach(k=>{ const el=$(k); el.checked=!!S[k]; el.onchange=()=>{ S[k]=el.checked; save(); }; });
+$('clockReset').onclick=()=>{ if(RC.remoteMode) return rsend({k:'cmd',c:'clock',a:'reset'}); clk.acc=0; if(clk.on) clk.from=performance.now(); clockTick(); };
+// songs
+// a name is required and must not repeat (ignoring case and spaces at the ends)
+function okName(inp,list){ const v=$(inp).value.trim(); if(!v) return null;
+  if(list.some(p=>String(p.name).trim().toLowerCase()===v.toLowerCase())){ toast('השם הזה כבר קיים'); $(inp).focus(); return null; } return v; }
+function nameBtns(){ [['songName','songSave'],['genPresetName','genPresetSave'],['trPresetName','trPresetSave']].forEach(([i,b])=>{ $(b).disabled=!$(i).value.trim(); }); }
+['songName','genPresetName','trPresetName'].forEach(i=>{ $(i).addEventListener('input',nameBtns); $(i).addEventListener('keydown',e=>{ if(e.key==='Enter'){ const b=$(i.replace('Name','Save')); if(!b.disabled) b.click(); } }); });
+let cfYes=null;
+// deleting is immediate when "don't ask" is set; every delete can be undone from the toast for a few seconds
+function askDel(name,yes,undo){
+  const go=()=>{ yes(); toast(`נמחק: ${name}`,{ico:'🗑',icoBg:'#3a1d1d',act:undo||null,label:'ביטול',bar:!!undo}); };
+  if(S.askDelOn===false){ go(); return; }
+  cfYes=go; $('cfText').textContent=`למחוק את "${name}"?`; $('cfNoAsk').checked=false; $('cfWrap').hidden=false; }
+$('cfNo').onclick=()=>{ cfYes=null; $('cfWrap').hidden=true; };
+$('cfYes').onclick=()=>{ const f=cfYes; cfYes=null; if($('cfNoAsk').checked){ S.askDelOn=false; $('askDelOn').checked=false; save(); } $('cfWrap').hidden=true; if(f) f(); };
+function renderSongs(){
+  const q=($('songFind').value||'').trim().toLowerCase(), L=S.songs.map((s,i)=>[s,i]).filter(([s])=>!q||String(s.name).toLowerCase().includes(q));
+  $('songList').innerHTML=S.songs.length?(L.length?L.map(([s,i])=>`<div class="song"><button class="load" data-i="${i}"><span>${String(s.name).replace(/[<>&"]/g,'')}</span><small><b>${s.bpm}</b> BPM · ${s.mBeats}/4</small></button><button class="del" data-d="${i}" aria-label="מחק">×</button></div>`).join(''):'<div class="hint">לא נמצא שיר.</div>'):'<div class="hint">עוד אין שירים שמורים.</div>';
+}
+const songSnap=()=>({bpm:S.bpm,mBeats:S.mBeats,mSub:S.mSub,mAcc:S.mAcc.slice()});
+const trSnap=()=>({trStart:S.trStart,trMax:S.trMax,trStep:S.trStep,trMode:S.trMode,trBars:S.trBars,trSec:S.trSec,mBeats:S.mBeats,mSub:S.mSub});
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const genSnap=()=>({mode:S.mode||'free',trkD:S.trkD!==false,trkT:!!S.trkT,manual:(S.manual||[]).slice(),grids:Object.assign({},S.grids),level:S.level,num:S.num,den:S.den,bars:S.bars,bpm:S.bpm,restLvl:S.restLvl,ties:S.ties});
+const esc=t=>String(t).replace(/[<>&"]/g,'');
+// shows which song / trainer preset is loaded, and whether it was changed since
+function presetLabels(){
+  const sl=S.songLoaded, sb=$('songBtn');
+  // a loaded song or preset stays named only while it matches exactly; any change drops the name
+  if(sl&&S.songs[sl.i]&&S.songs[sl.i].name===sl.name&&same(songSnap(),sl.snap)){ $('mSong').textContent=`♪ ${sl.name}`; $('mSong').hidden=false; sb.classList.add('on'); }
+  else { S.songLoaded=null; $('mSong').hidden=true; sb.classList.remove('on'); }
+  const gl=S.genLoaded, gb=$('genPresetBtn');
+  if(gl&&S.genPresets[gl.i]&&S.genPresets[gl.i].name===gl.name&&same(genSnap(),gl.snap)){ $('genPresetT').textContent=gl.name; gb.classList.add('on'); gb.title=gl.name; }
+  else { S.genLoaded=null; $('genPresetT').textContent='הגדרות שמורות'; gb.classList.remove('on'); }
+  const tl=S.trLoaded, tb=$('trPresetBtn');
+  if(tl&&S.trPresets[tl.i]&&S.trPresets[tl.i].name===tl.name&&same(trSnap(),tl.snap)){ $('trPresetT').textContent=tl.name; tb.classList.add('on'); }
+  else { S.trLoaded=null; $('trPresetT').textContent='תרגילים'; tb.classList.remove('on'); }
+}
+$('songList').onclick=e=>{ const l=e.target.closest('.load'), d=e.target.closest('.del');
+  if(l){ const i=+l.dataset.i, s=S.songs[i]; S.mBeats=s.mBeats; S.mSub=s.mSub; S.mAcc=s.mAcc.slice(); setBpm(s.bpm); mbSync(); $('mSub')._sync(); buildCols(); S.songLoaded={i,name:s.name,snap:songSnap()}; save(); updateQuick(); closePop(); toast(`נטען: ${s.name}`); }
+  if(d){ const i=+d.dataset.d, it=S.songs[i]; askDel(it.name,()=>{ S.songs.splice(i,1); if(S.songLoaded&&S.songLoaded.i>=i) S.songLoaded=null; save(); renderSongs(); updateQuick(); },()=>{ S.songs.splice(i,0,it); save(); renderSongs(); updateQuick(); }); } };
+$('songSave').onclick=()=>{ const name=okName('songName',S.songs); if(!name) return; S.songs.push({name,...songSnap()}); S.songLoaded={i:S.songs.length-1,name,snap:songSnap()}; $('songName').value=''; nameBtns(); save(); renderSongs(); updateQuick(); };
+// each saved exercise as a card with its stairs drawn on one tempo scale (40-240) so cards compare at a glance
+function trMini(p){ const down=p.trMax<p.trStart, span=Math.abs(p.trMax-p.trStart), n=Math.max(1,Math.ceil(span/p.trStep)), W=96, H=34, gap=n>16?1:2, w=(W-gap*n)/(n+1);
+  let r=''; for(let i=0;i<=n;i++){ const b=down?Math.max(p.trMax,p.trStart-i*p.trStep):Math.min(p.trMax,p.trStart+i*p.trStep), h=4+(H-4)*clamp((b-40)/200,0,1); r+=`<rect x="${(i*(w+gap)).toFixed(1)}" y="${(H-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5"/>`; }
+  return `<svg class="tmini" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${r}</svg>`; }
+function trDur(p){ const o={trStart:S.trStart,trMax:S.trMax,trStep:S.trStep,trMode:S.trMode,trBars:S.trBars,trSec:S.trSec,mBeats:S.mBeats}; Object.assign(S,p); const t=trPlan().total; Object.assign(S,o); return t; }
+function renderTrPresets(){
+  const tl=S.trLoaded;
+  $('trPresetList').innerHTML=S.trPresets.length?S.trPresets.map((p,i)=>`<div class="song tcard${tl&&tl.i===i?' on':''}"><button class="load" data-i="${i}"><span class="tn"><b>${esc(p.name)}</b><small dir="ltr"><span class="hl">${p.trStart} → ${p.trMax}</span> BPM</small><span class="tags"><i>${p.mBeats}/4</i><i>⏱ ${fmt(trDur(p))}</i><i>${p.trMode==='bars'?p.trBars+' תיבות':fmt(p.trSec)}</i><i dir="ltr">${p.trMax<p.trStart?'−':'+'}${p.trStep}</i></span></span>${trMini(p)}</button><button class="del" data-d="${i}" aria-label="מחק">×</button></div>`).join(''):'<div class="hint">עוד אין תרגילים שמורים. מגדירים תרגיל ושומרים אותו כאן.</div>';
+}
+$('trPresetList').onclick=e=>{ const l=e.target.closest('.load'), d=e.target.closest('.del');
+  if(l){ const i=+l.dataset.i, p=S.trPresets[i]; ['trStart','trMax','trStep','trMode','trBars','trSec','mBeats','mSub'].forEach(k=>S[k]=p[k]);
+    ['trStart','trMax','trStep','trBars'].forEach(k=>$(k).value=S[k]); secSync(); $('trMode')._sync(); $('mSub')._sync(); mbSync(); buildCols();
+    S.trLoaded={i,name:p.name,snap:trSnap()}; save(); updateQuick(); closePop(); toast(`נטען: ${p.name}`); }
+  if(d){ const i=+d.dataset.d, it=S.trPresets[i]; askDel(it.name,()=>{ S.trPresets.splice(i,1); if(S.trLoaded&&S.trLoaded.i>=i) S.trLoaded=null; save(); renderTrPresets(); updateQuick(); },()=>{ S.trPresets.splice(i,0,it); save(); renderTrPresets(); updateQuick(); }); } };
+$('trPresetSave').onclick=()=>{ const name=okName('trPresetName',S.trPresets); if(!name) return; S.trPresets.push({name,...trSnap()}); S.trLoaded={i:S.trPresets.length-1,name,snap:trSnap()}; $('trPresetName').value=''; nameBtns(); save(); renderTrPresets(); updateQuick(); };
+renderTrPresets();
+function renderGenPresets(){
+  $('genPresetList').innerHTML=S.genPresets.length?S.genPresets.map((p,i)=>`<div class="song"><button class="load" data-i="${i}"><span>${esc(p.name)}</span><small>${p.num}/${p.den} · ${p.bars} · ${p.level}</small></button><button class="del" data-d="${i}" aria-label="מחק">×</button></div>`).join(''):'<div class="hint">עוד אין הגדרות שמורות.</div>';
+}
+$('genPresetList').onclick=e=>{ const l=e.target.closest('.load'), d=e.target.closest('.del');
+  if(l){ const i=+l.dataset.i, p=S.genPresets[i];
+    S.grids=Object.assign({},p.grids); ['level','num','den','bars','restLvl','ties'].forEach(k=>S[k]=p[k]); S.mode=p.mode||'free'; S.trkD=p.trkD!==false; S.trkT=!!p.trkT; if(p.manual) S.manual=p.manual.slice(); setBpm(p.bpm);
+    syncGrids(); meterSync(); barsSync(); $('level').value=S.level; $('levelOut').textContent=S.level; restSync(); $('ties').checked=S.ties;
+    S.genLoaded={i,name:p.name,snap:genSnap()}; save(); updateQuick(); closePop(); regen(); toast(`נטען: ${p.name}`); }
+  if(d){ const i=+d.dataset.d, it=S.genPresets[i]; askDel(it.name,()=>{ S.genPresets.splice(i,1); if(S.genLoaded&&S.genLoaded.i>=i) S.genLoaded=null; save(); renderGenPresets(); updateQuick(); },()=>{ S.genPresets.splice(i,0,it); save(); renderGenPresets(); updateQuick(); }); } };
+$('genPresetSave').onclick=()=>{ const name=okName('genPresetName',S.genPresets); if(!name) return; S.genPresets.push({name,...genSnap()}); S.genLoaded={i:S.genPresets.length-1,name,snap:genSnap()}; $('genPresetName').value=''; nameBtns(); save(); renderGenPresets(); updateQuick(); };
+renderGenPresets();
+renderSongs();
+nameBtns();
+
+{{UIJS}}
+/* popups: each one borrows its field from the settings sheet */
+const POPS={vol:['עוצמה','fVol'],genPresets:['הגדרות שמורות','fGenPresets'],trPresets:['תרגילים שמורים','fTrPresets'],style:['סגנון','fStyle'],meter:['משקל','fMeter'],bars:['תיבות','fBars'],level:['מורכבות','fLevel'],tempo:['טמפו','fTempo'],
+  mbeats:['משקל','fMBeats'],msub:['חלוקה','fMSub'],sound:['צליל','fSound'],songs:['שירים','fSongs'],gap:['הפסקות','fGap'],clock:['שעון תרגול','fClock'],trSet:['הגדרות תרגיל','fTrSet'],history:['היסטוריה','fHistory'],dyn:['דינמיקה','fDyn']};
+let popField=null, popHome=null;
+function openPop(key){
+  if(isPlaying()&&!['clock','vol','tempo','gap','sound','msub','mbeats'].includes(key)) return;
+  if(isPlaying()&&S.tab!=='met'&&key!=='clock'&&key!=='vol') return;
+  const [title,id]=POPS[key]; closePop();
+  popField=$(id); popHome=document.createComment('home'); popField.parentNode.insertBefore(popHome,popField);
+  $('popTitle').textContent=title; $('popBody').appendChild(popField);
+  $('pop').querySelector('.popcard').classList.toggle('fixlist',popField.classList.contains('plist'));
+  if(key==='history'){ HIST.open=null; histRender(); }
+  if(key==='level'){ lvlUI(S.level); modeUI(); }
+  if(key==='dyn') dynUI();
+  if(key==='tempo') tpOpen();
+  if(key==='trSet') trSetUI();
+  if(key==='gap') gapUI();
+  if(key==='songs'){ $('songFind').value=''; renderSongs(); }
+  if(key==='vol') mixDraw();
+  if(key==='trPresets') renderTrPresets();
+  $('pop').classList.add('open'); $('pop').setAttribute('aria-hidden','false');
+  requestAnimationFrame(()=>{ Object.values(WH).forEach(w=>w&&w.el.offsetParent&&w.center(false)); });
+  return;
+  $('pop').classList.add('open'); $('pop').setAttribute('aria-hidden','false');
+}
+function closePop(){
+  closeKeypad(); if(TP.tapMode) tpMode(false); TP.typing=false;
+  if(popField){ popHome.parentNode.insertBefore(popField,popHome); popHome.remove(); popField=null; }
+  $('pop').classList.remove('open'); $('pop').setAttribute('aria-hidden','true');
+  if(S.tab==='tr'&&!playing) trIdle();
+}
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-pop]'); if(b){ e.preventDefault(); openPop(b.dataset.pop); } });
+$('popClose').onclick=closePop;
+$('pop').addEventListener('click',e=>{ if(e.target===$('pop')) closePop(); });
+function openSheet(){ if(isPlaying()) return; fmSync(); $('sheet').classList.add('open'); $('sheet').setAttribute('aria-hidden','false'); $('sheetBody').scrollTop=0; }
+function closeSheet(){ $('sheet').classList.remove('open'); $('sheet').setAttribute('aria-hidden','true'); if(S.tab==='tr') trIdle(); }
+$('closeSheet').onclick=closeSheet;
+$('tabSet').onclick=openSheet;
+
+function setTab(t){
+  if(playing) stop();
+  S.tab=t; save();
+  $('tabGen').setAttribute('aria-selected',t==='gen'); $('tabMet').setAttribute('aria-selected',t==='met'); $('tabTr').setAttribute('aria-selected',t==='tr');
+  $('score').hidden=t!=='gen'; $('quickGen').hidden=t!=='gen'; $('genTop').hidden=t!=='gen'; $('ruler').hidden=t!=='gen';
+  $('metView').hidden=t!=='met'; $('quickMet').hidden=t!=='met';
+  $('trView').hidden=t!=='tr'; $('quickTr').hidden=t!=='tr';
+  $('newBtn').hidden=t!=='gen'; $('filmBtn').hidden=t!=='gen'||!FILMBTN; $('mTap').hidden=t!=='met'; $('songBtn').hidden=t!=='met'; $('trPresetBtn').hidden=t!=='tr';
+  tapUI();
+  $('live').hidden=true;
+  updateQuick(); if(t==='tr') trIdle(); if(t==='met') clockTick(); if(t==='gen') requestAnimationFrame(()=>{ fitScore(); rulerDraw(); });
+}
+$('tabGen').onclick=()=>setTab('gen'); $('tabMet').onclick=()=>setTab('met'); $('tabTr').onclick=()=>setTab('tr');
+$('play').onclick=toggle;
+$('newBtn').onclick=()=>requestNew();
+// keyboard: space play/stop, N new, arrows tempo (shift = 5), 1-4 tabs
+document.addEventListener('keydown',e=>{ if(FILM.on){ filmKey(e); return; }
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||e.ctrlKey||e.metaKey||e.altKey) return;
+  if($('sheet').classList.contains('open')||$('pop').classList.contains('open')||!$('cfWrap').hidden) return;
+  const k=e.key;
+  if(e.code==='Space'){ e.preventDefault(); toggle(); return; }
+  if((k==='n'||k==='N'||k==='מ')&&S.tab==='gen'){ e.preventDefault(); requestNew(); return; }
+  if(k==='ArrowUp'||k==='ArrowRight'){ e.preventDefault(); setBpm(S.bpm+(e.shiftKey?5:1)); save&&save(); return; }
+  if(k==='ArrowDown'||k==='ArrowLeft'){ e.preventDefault(); setBpm(S.bpm-(e.shiftKey?5:1)); save&&save(); return; }
+  const tb={'1':'tabGen','2':'tabMet','3':'tabTr','4':'tabSet'}[k]; if(tb){ e.preventDefault(); $(tb).click(); }
+});
+
+// shrink the bars so every bar fits on screen; two columns when one column would get too small
+function fitScore(){
+  const sc=$('score'); if(sc.hidden) return;
+  const boxes=[...sc.querySelectorAll('.barbox')], n=boxes.length; if(!n) return;
+  const vb=boxes[0].querySelector('svg').viewBox.baseVal, ratio=vb.height/vb.width, cs=getComputedStyle(sc), gap=parseFloat(cs.rowGap)||8, pad=16;
+  const W=sc.clientWidth, H=sc.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0)-1;
+  // px per notation unit: the layout that draws the notes bigger wins
+  const fit=c=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*ratio+pad, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,h,px:Math.min(cw/vb.width,(h-pad)/vb.height)}; };
+  let f=fit(1); if(n>=3){ const f2=fit(2); if(f2.px>f.px*1.05) f=f2; }
+  sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(18,f.h).toFixed(2)}px`; // never scroll: every bar is on screen
+}
+new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }catch(e){} }).observe($('score'),{childList:true});
+window.addEventListener('resize',fitScore);
+setBpm(S.bpm); buildCols(); setTab(S.tab);
+rhythm=genRhythm(); render();
+{{REMOTE}}
+})();
+</script>

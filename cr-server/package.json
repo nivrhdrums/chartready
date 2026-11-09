@@ -1,0 +1,15 @@
+{
+  "name": "chartready-server",
+  "version": "1.0.0",
+  "description": "ChartReady app + remote-control relay",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "private": true
+}

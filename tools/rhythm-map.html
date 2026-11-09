@@ -1,0 +1,398 @@
+<title>מפת מקצבים</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Secular+One&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one scrolling sheet of beat cards grouped by family; a fixed bottom bar counts exclusions and copies the list. Dark-only, matching NivBot. */
+:root{
+  --bg:#0c0e12; --card:#1b2028; --panel:#232934; --raise:#2c3340; --ink:#eef1f6; --muted:#8e98a8;
+  --line:#353d4a; --accent:#6f8dff; --accent-ink:#0c0e12; --off:#ff7a7a; --off-soft:#3a2026;
+  --f-display:"Secular One","Assistant",system-ui,sans-serif;
+  --f-body:"Assistant",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+@font-face{font-family:"LelandN";src:url(data:font/woff;base64,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) format("woff");font-display:block}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--f-body);font-size:16px;line-height:1.45;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 110px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:22px;padding-top:20px}
+h1{font:400 28px var(--f-display);margin:0}
+.lead{color:var(--muted);margin:4px 0 0;max-width:60ch}
+section{display:flex;flex-direction:column;gap:10px}
+.sh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2{font:400 20px var(--f-display);margin:0}
+.sh small{color:var(--muted);font-size:13px}
+.secbtns{display:flex;gap:6px}
+.mini{font:600 13px var(--f-body);border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:5px 10px;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.cardb{position:relative;border:2px solid transparent;background:var(--card);border-radius:12px;padding:6px 4px 2px;cursor:pointer;color:var(--ink);text-align:start;font:inherit}
+.cardb svg{display:block;width:100%;height:auto}
+.cardb .code{position:absolute;top:5px;left:8px;font:500 10px var(--f-num);color:var(--muted)}
+.cardb .tag{position:absolute;top:4px;right:8px;font:700 11px var(--f-body);color:var(--off);opacity:0}
+.cardb.off{background:var(--off-soft);border-color:var(--off)}
+.cardb.off svg{opacity:.35}
+.cardb.off .tag{opacity:1}
+.cardb:focus-visible,.mini:focus-visible,.copy:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* notation (same as NivBot) */
+.mg{font-family:"LelandN";font-size:40px;fill:var(--ink)}
+.beam{fill:var(--ink)}
+.hole{fill:var(--card)}
+.staff{stroke:var(--ink);stroke-width:1.2}
+.barline{stroke:transparent}
+.tie{fill:var(--ink)}
+.vars{display:flex;flex-direction:column;gap:2px;padding-top:14px}
+.vars .or{font:600 11px var(--f-body);color:var(--muted);text-align:center;margin:0}
+.cardb.wide{grid-column:span 2}
+.cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+.cardb svg{direction:ltr}
+.dl{direction:ltr}
+.cell.wide{grid-column:span 2}
+.cell .cardb{width:100%}
+.dl{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--panel);border-radius:10px;padding:3px 4px}
+.dl button{width:30px;height:28px;border:0;border-radius:8px;background:var(--raise);color:var(--ink);font:700 16px var(--f-num);cursor:pointer}
+.dl span{font:600 13px var(--f-body);color:var(--muted)}
+.dl b{font:600 15px var(--f-num);color:var(--ink)}
+.dl.edited b{color:var(--accent)}
+.lv1 b{color:#7fe0b0}.lv2 b{color:#e7d36f}.lv3 b{color:#ff9b9b}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{font:600 14px var(--f-body);padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.fchip[aria-pressed="true"]{background:var(--raise);border-color:var(--accent);color:var(--accent)}
+.how{background:var(--panel);border-radius:12px;padding:12px 14px;color:var(--muted);font-size:14px;line-height:1.6}
+.how b{color:var(--ink)}
+.feel{position:absolute;bottom:4px;left:8px;font:600 10px var(--f-body);color:var(--muted)}
+.stem{stroke:var(--ink);stroke-width:1.7}
+.trip{font:600 12px var(--f-num);fill:var(--ink);text-anchor:middle}
+.tripline{stroke:var(--ink);stroke-width:1.1;fill:none}
+.cnt{font:500 11px var(--f-num);fill:#4f5867;text-anchor:middle}
+.cnt.hit{fill:var(--muted);font-weight:600}
+.bar{position:fixed;inset:auto 0 0 0;background:var(--panel);border-top:1px solid var(--line);padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));z-index:5}
+.bar .in{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:12px;justify-content:space-between}
+.bar b{font:600 18px var(--f-num)}
+.copy{border:0;background:var(--accent);color:var(--accent-ink);font:700 16px var(--f-body);padding:12px 18px;border-radius:12px;cursor:pointer}
+#out{width:100%;min-height:60px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;font:12px var(--f-num);padding:8px;box-sizing:border-box;direction:ltr}
+.dl.lp{margin-top:4px;background:#2a2230}
+.dl.lp b{color:#ff8a5a}
+</style>
+
+<div class="wrap" dir="rtl">
+  <header>
+    <h1>מפת מקצבים</h1>
+    <p class="lead">כל המקצבים שהמחולל יכול לכתוב, בכתיבה לפי הספר (כתיבה מקצועית: מקצוען). סקסטולות מופיעות בכל הצורות שהאפליקציה עשויה לבחור. גע בכרטיס כדי לסמן שלא יופיע, ובסוף לחץ "העתק" ושלח לי.</p>
+  </header>
+  <div class="how"><b>ציון קושי (1 עד 10).</b> כל מקצב מתחיל מבסיס לפי החלוקה: רבעים ושמיניות 0, שש־עשריות 1, טריולות 2, סקסטולות וטריולת רבעים 3, טריולת חצאים 4. נוסף <b>2</b> אם הפעמה מתחילה בהפסקה, <b>1.5</b> לכל מכה שלא על מקום חזק כשלפניה אין מכה (e או a בודדים, & של טריולה), <b>0.5</b> לכל הפסקה באמצע, ובסקסטולות <b>1</b> אם היא רק בתחושה של 3 ו־<b>3</b> אם היא "בין התחושות". הציון הוא 1 ועוד הסכום. תקן עם − ו־+ כל מקום שלא מרגיש לך נכון.</div>
+  <div class="filters" id="filters"><button class="fchip" data-f="all" aria-pressed="true">הכל</button><button class="fchip" data-f="1">קל 1–3</button><button class="fchip" data-f="2">בינוני 4–6</button><button class="fchip" data-f="3">קשה 7–10</button></div>
+  <div id="sections"></div>
+  <textarea id="out" readonly hidden aria-label="הרשימה להעתקה"></textarea>
+</div>
+<div class="bar"><div class="in" dir="rtl"><div><b id="cnt">0</b> <span id="cntTxt">מקצבים הוצאו</span></div><button class="copy" id="copy">העתק רשימה</button></div></div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const S={restLvl:0,ties:false,showCount:true,sextCount:'mix'};
+/* ---------- notation ---------- */
+const SP=10, L=62, STEMTOP=L-3.5*SP, HW=11.8, SW=1.3, PADL=10;
+const GL={whole:'',half:'',black:'',f8:'',f16:'',r1:'',r2:'',r4:'',r8:'',r16:'',dot:''};
+const NV={3:{h:'black',b:2},6:{h:'black',b:1},9:{h:'black',b:1,d:1},12:{h:'black',b:0},18:{h:'black',b:0,d:1},24:{h:'half',b:0},36:{h:'half',b:0,d:1},48:{h:'whole',b:0}};
+const RV={3:['r16'],6:['r8'],9:['r8',1],12:['r4'],18:['r4',1],24:['r2'],36:['r2',1],48:['r1']};
+function rng(seed){return ()=>{seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function greedy(n,vals){const out=[];for(const v of vals){while(n>=v-1e-9){out.push(v);n-=v;}}return out;}
+const isInt=x=>Math.abs(x-Math.round(x))<1e-9;
+// Turns generated hits into written notes. opt: {p: rest level 0..1, feel:'d'|'t', longBroken, ties}
+function notate(bar,r,seed,opt){
+  opt=opt||{};
+  const p=opt.p!=null?opt.p:S.restLvl/100, ties=opt.ties!=null?opt.ties:S.ties, up=r.den===4?12:6, R=rng(seed||1);
+  const ch=x=>x>=1?true:x<=0?false:R()<x;
+  const groups=[], toks=[]; let brId=0, tk=0;
+  const mk=(g,kind,tick,dur,tup,br)=>{const t={kind,tick,dur,grp:g,tup:!!tup,br}; toks.push(t); return t;};
+  function tokenize(g,on,s0,n,u,vals,mode,tup,br){
+    let i=s0; const end=s0+n;
+    while(i<end){
+      let j=i+1; while(j<end&&!on[j]) j++;
+      if(on[i]){
+        const nv=mode==='rests'?1:vals.find(v=>v<=j-i);
+        mk(g,'note',g.start+i*u,nv*u,tup,br); let q=i+nv;
+        greedy(j-i-nv,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;});
+      } else { let q=i; greedy(j-i,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;}); }
+      i=j;
+    }
+  }
+  function sext(g,on,u,mode){
+    const s=on.map(x=>x?'1':'0').join(''), okH=h=>h==='100'||h==='111'||h==='000';
+    const dOk=okH(s.slice(0,3))&&okH(s.slice(3)), tOk=s.indexOf('1')%2===0;
+    g.simple=dOk;
+    let feel;
+    if(s==='000001'){ feel='d'; mode='extend'; }
+    else if(opt.feel&&(opt.feel==='d'?dOk:tOk)) feel=opt.feel;
+    else if(dOk&&tOk) feel=ch(.5)?'d':'t';
+    else if(dOk) feel='d'; else if(tOk) feel='t';
+    else feel=mode==='extend'?'d':(ch(.5)?'d':'t3');
+    if(feel==='d'){
+      [0,3].forEach(o=>{
+        const hp=s.slice(o,o+3);
+        if(hp==='000'){ mk(g,'rest',g.start+o*u,3*u,0,null); return; }
+        if(hp==='100'&&mode==='extend'){ mk(g,'note',g.start+o*u,3*u,0,null); return; }
+        tokenize(g,on,o,3,u,[2,1],mode,1,brId++);
+      });
+    } else {
+      const br=brId++;
+      if(feel==='t'&&mode==='extend') tokenize(g,on,0,6,u,[4,3,2,1],'extend',1,br);
+      else [0,2,4].forEach(o=>tokenize(g,on,o,2,u,[2,1],'extend',1,br));
+    }
+  }
+  function processQ(bt,start,len){
+    const hits=[]; bt.slots.forEach((h,i)=>{ if(h) hits.push(i*len/bt.g); });
+    const restMode=ch(p), raw=restMode&&ch(p);
+    let G=bt.g;
+    if(!raw){ if(!hits.length) G=bt.t==='q'?1:bt.k; else G=(bt.t==='q'?[1,2,3,4,6]:[bt.k,2*bt.k]).find(c=>hits.every(o=>isInt(o*c/len))); }
+    const g={t:bt.t,k:bt.k,start,len,G,tup:bt.t==='q'&&(G===3||G===6)?G:0}; groups.push(g);
+    const u=len/G, on=new Array(G).fill(false); hits.forEach(o=>on[Math.round(o/u)]=true);
+    const mode=restMode?'rests':'extend';
+    if(g.tup===6){ sext(g,on,u,mode); return; }
+    const vals=g.t==='q'?{1:[1],2:[2,1],4:[4,3,2,1],3:[2,1]}[G]:(G===g.k?[3,2,1]:[6,4,3,2,1]).filter(v=>v<=G);
+    tokenize(g,on,0,G,u,vals,mode,g.tup,g.tup?brId++:null);
+  }
+  bar.forEach(bt=>{
+    const len=bt.k*up, start=tk; tk+=len;
+    if(bt.t!=='L'){ processQ(bt,start,len); return; }
+    const hitsT=[]; bt.slots.forEach((h,i)=>{ if(h) hitsT.push(start+i*len/bt.g); });
+    const broken=opt.longBroken!=null?opt.longBroken:ch(p);
+    if(broken){
+      for(let b=0;b<bt.k;b++){ const s=start+b*12; processQ({t:'q',k:1,g:3,slots:[0,1,2].map(i=>hitsT.some(h=>Math.abs(h-(s+i*4))<1e-9))},s,12); }
+      return;
+    }
+    const g={t:'L',k:bt.k,start,len,G:6,tup:3,long:true}; groups.push(g);
+    const u=len/6, br=brId++;
+    [0,1,2].forEach(c=>{
+      const a=bt.slots[c*2], z=bt.slots[c*2+1], t0=start+c*2*u;
+      if(a&&z){ mk(g,'note',t0,u,1,br); mk(g,'note',t0+u,u,1,br); }
+      else if(a) mk(g,'note',t0,2*u,1,br);
+      else if(z){ mk(g,'rest',t0,u,1,br); mk(g,'note',t0+u,u,1,br); }
+      else mk(g,'rest',t0,2*u,1,br);
+    });
+  });
+  const total=tk, plain=g=>!g.tup&&!g.long;
+  if(r.den===4){
+    for(let x=0;x<toks.length;x++){
+      const N=toks[x];
+      if(N.kind!=='note'||!plain(N.grp)||N.tick+N.dur!==N.grp.start+N.grp.len) continue;
+      let y=x+1; while(y<toks.length&&toks[y].kind==='rest') y++;
+      if(y===x+1) continue;
+      let stop=y<toks.length?toks[y].tick:total;
+      for(let z=x+1;z<=y&&z<toks.length;z++) if(!plain(toks[z].grp)){ stop=Math.min(stop,toks[z].grp.start); break; }
+      const avail=stop-N.tick;
+      const c=[48,36,24,18,12].find(d=>d>N.dur&&d<=avail&&(d===48?N.tick===0:d>=24?N.tick%12===0:N.tick%6===0));
+      const nx=toks[x+1], canTie=ties&&nx.kind==='rest'&&plain(nx.grp)&&nx.tick===N.tick+N.dur;
+      const opts=[]; if(c) opts.push('ext'); if(canTie) opts.push('tie');
+      if(!opts.length||ch(p)) continue;
+      const pick=opts[Math.floor(R()*opts.length)];
+      if(pick==='tie'){ nx.kind='note'; nx.tied=true; N.tieTo=nx; continue; }
+      const E=N.tick+c; N.dur=c;
+      const keep=[];
+      for(let z=x+1;z<y;z++){
+        const t=toks[z], te=t.tick+t.dur;
+        if(te<=E) continue;
+        if(t.tick>=E){ keep.push(t); continue; }
+        let q=E; greedy(te-E,[12,9,6,3]).forEach(v=>{keep.push({kind:'rest',tick:q,dur:v,grp:t.grp,tup:false,br:null});q+=v;});
+      }
+      toks.splice(x+1,y-x-1,...keep);
+    }
+    for(let x=0;x<toks.length-1;x++){
+      const a=toks[x], b=toks[x+1];
+      if(a.kind==='rest'&&b.kind==='rest'&&!a.tup&&!b.tup&&a.dur===12&&b.dur===12&&a.tick%24===0&&b.tick===a.tick+12&&plain(a.grp)&&plain(b.grp)&&!ch(p)){ a.dur=24; toks.splice(x+1,1); }
+    }
+  }
+  return {groups,toks,total,den:r.den,num:r.num};
+}
+function groupW(g,used){ if(g.long) return g.k===2?150:240; if(!used) return 34; if(g.t==='e') return (g.G===g.k?24:15)*g.G+12; return {1:40,2:52,3:62,4:76,6:100}[g.G]; }
+function layoutBar(bar,r,opt){
+  const nt=notate(bar,r,bar.seed,opt), used=new Set(nt.toks.map(t=>t.grp));
+  let x=PADL; nt.groups.forEach(g=>{g.w=groupW(g,used.has(g)); g.x=x; x+=g.w;});
+  nt.width=x+10; return nt;
+}
+const tickX=(g,t)=>g.x+8+(t-g.start)/g.len*(g.w-16);
+function syl(t,g){
+  if(g.t==='e'){ const u=t/6; return isInt(u)?String(Math.round(u)+1):'&'; }
+  const b=Math.floor(t/12+1e-9), f=(t-b*12)/12, n=String(b+1);
+  if(g.long||g.tup===3) return [n,'&','a'][Math.round(f*3)]||n;
+  if(g.tup===6){ const i=Math.round(f*6), m=S.sextCount||'mix'; return (m==='eighth'||(m==='mix'&&g.simple))?[n,'','','&','',''][i]:String(i+1); }
+  return [n,'e','&','a'][Math.round(f*4)];
+}
+const mg=(ch,x,y)=>`<text class="mg" x="${x.toFixed(1)}" y="${y}">${ch}</text>`;
+function svgBar(bar,bi,r,width,opt){
+  const nt=layoutBar(bar,r,opt), H=S.showCount?100:80;
+  const kx=(width-PADL-10)/(nt.width-PADL-10), X=x=>PADL+(x-PADL)*kx;
+  const tx=t=>X(tickX(t.grp,t.tick));
+  const nd=t=>t.tup?t.dur*3/2:t.dur;
+  const id=t=>`n${bi}_${Math.round(t.tick)}`;
+  const sx=t=>tx(t)+HW-SW/2;
+  let s=`<line class="staff" x1="0" y1="${L}" x2="${width}" y2="${L}"/>`;
+  const runs=[];
+  nt.groups.forEach(g=>{
+    let run=[];
+    nt.toks.filter(t=>t.grp===g).forEach(t=>{
+      if(t.kind==='rest') return;
+      if((NV[nd(t)]||NV[12]).b>0) run.push(t); else { if(run.length) runs.push(run); run=[]; }
+    });
+    if(run.length) runs.push(run);
+  });
+  const beamed=new Set(); runs.forEach(rn=>{ if(rn.length>1) rn.forEach(t=>beamed.add(t)); });
+  nt.toks.forEach(t=>{
+    const x=tx(t), v=nd(t);
+    if(t.kind==='rest'){ const [g,dot]=RV[v]||RV[12]; s+=mg(GL[g],x-2,L); if(dot) s+=mg(GL.dot,x+12,L-5); return; }
+    const info=NV[v]||NV[12];
+    // hollow heads: a thin outline with no staff line showing through
+    const hx=x+(info.h==='whole'?7.2:5.9), hole=info.h==='whole'?`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="3" ry="4" transform="rotate(-30 ${hx.toFixed(1)} ${L})"/>`:`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="4.8" ry="3" transform="rotate(-25 ${hx.toFixed(1)} ${L})"/>`;
+    let inner=info.h==='black'?mg(GL[info.h],x,L):info.h==='whole'?hole+mg(GL[info.h],x,L):mg(GL[info.h],x,L)+hole;
+    if(info.h!=='whole') inner+=`<line class="stem" x1="${sx(t)}" y1="${L-1.7}" x2="${sx(t)}" y2="${STEMTOP}"/>`;
+    if(info.b&&!beamed.has(t)) inner+=mg(info.b===2?GL.f16:GL.f8,x+HW-SW,STEMTOP);
+    s+=t.tied?`<g>${inner}</g>`:`<g class="n" id="${id(t)}">${inner}</g>`;
+    if(info.d) s+=mg(GL.dot,x+HW+4,L-5);
+  });
+  nt.toks.forEach(t=>{ if(!t.tieTo) return; const x1=tx(t)+7, x2=tx(t.tieTo)+5, m=(x1+x2)/2;
+    s+=`<path class="tie" d="M${x1} ${L+7} Q${m} ${L+17} ${x2} ${L+7} Q${m} ${L+13} ${x1} ${L+7}Z"/>`; });
+  runs.forEach(rn=>{
+    if(rn.length<2) return;
+    const a=sx(rn[0]), b=sx(rn[rn.length-1]);
+    s+=`<rect class="beam" x="${a-SW/2}" y="${STEMTOP}" width="${b-a+SW}" height="5"/>`;
+    const two=q=>q&&(NV[nd(q)]||NV[12]).b===2;
+    rn.forEach((t,k)=>{
+      if(!two(t)) return;
+      const nx=rn[k+1], pv=rn[k-1];
+      if(two(nx)) s+=`<rect class="beam" x="${sx(t)-SW/2}" y="${STEMTOP+7.5}" width="${sx(nx)-sx(t)+SW}" height="5"/>`;
+      else if(!two(pv)){ const x1=k===rn.length-1?sx(t)-8:sx(t); s+=`<rect class="beam" x="${x1-SW/2}" y="${STEMTOP+7.5}" width="${8+SW}" height="5"/>`; }
+    });
+  });
+  const brs={}; nt.toks.forEach(t=>{ if(t.br!=null) (brs[t.br]=brs[t.br]||[]).push(t); });
+  Object.values(brs).forEach(ts=>{
+    const last=ts[ts.length-1], endT=Math.max(...ts.map(t=>t.tick+t.dur)), flagged=last.kind==='note'&&!beamed.has(last)&&(NV[nd(last)]||NV[12]).b;
+    const a=tx(ts[0])+(ts[0].kind==='note'?4:0), b=Math.max(tx(last)+HW+(flagged?14:6), X(tickX(last.grp,endT))-6), m=(a+b)/2, y=STEMTOP-8;
+    s+=`<path class="tripline" d="M${a} ${y+6} v-6 H${m-7} M${m+7} ${y} H${b} v6"/><text class="trip" x="${m}" y="${y+4}">3</text>`;
+  });
+  if(S.showCount){
+    // every count position of each beat, at the finest subdivision that beat uses
+    const hitAt=new Set(nt.toks.filter(t=>t.kind==='note'&&!t.tied).map(t=>Math.round(t.tick)));
+    const tokAt=new Map(nt.toks.map(t=>[Math.round(t.tick),t])), done=new Set();
+    const put=(g,tt)=>{ const k=Math.round(tt); if(done.has(k)) return; const lab=syl(tt,g); if(!lab) return; done.add(k);
+      const t=tokAt.get(k), x=t?tx(t):X(tickX(g,tt));
+      s+=`<text class="cnt${hitAt.has(k)?' hit':''}"${t?` id="c${id(t)}"`:''} x="${(x+HW/2).toFixed(1)}" y="${L+32}">${lab}</text>`; };
+    nt.groups.forEach(g=>{
+      if(g.long){ for(let i=0;i<g.k*3;i++) put(g,g.start+i*4); return; }
+      let G=g.G;
+      if(!g.tup){ const offs=nt.toks.filter(t=>t.tick>=g.start-1e-9&&t.tick<g.start+g.len-1e-9).map(t=>t.tick-g.start);
+        G=(g.t==='q'?[1,2,4]:[g.k,2*g.k]).find(c=>offs.every(o=>isInt(o*c/g.len)))||G; }
+      for(let i=0;i<G;i++) put(g,g.start+i*g.len/G);
+    });
+  }
+  s+=`<line class="barline" x1="${width-1}" y1="${L-16}" x2="${width-1}" y2="${L+16}"/>`;
+  // crop to what this bar uses: room for a tuplet bracket only when there is one, the count row only when shown
+  const Y0=nt.groups.some(g=>g.tup||g.long)?STEMTOP-22:STEMTOP-4, Y1=S.showCount?L+36:L+22;
+  return `<svg viewBox="0 ${Y0} ${width} ${Y1-Y0}" role="img" aria-label="תיבה ${typeof bi==='number'?bi+1:'הבאה'}">${s}</svg>`;
+}
+const B=s=>[...s].map(c=>c==='1');
+function diffRaw(p){
+  if(p.long){ const s=p.bits; let r=p.long===2?3:4; if(s[0]!=='1') r+=2;
+    for(let c=0;c<3;c++){ const cell=s.slice(c*2,c*2+2); if(cell==='01') r+=1.5; if(cell==='00'&&s.slice(0,c*2).includes('1')&&s.slice(c*2+2).includes('1')) r+=.5; }
+    return r; }
+  const g=p.g, b=[...p.bits].map(x=>x==='1');
+  if(!b.some(Boolean)) return 0;
+  let r={4:1,3:2,6:3}[g];
+  if(g===4&&b.every((x,i)=>!x||i%2===0)) r=0;
+  if(!b[0]) r+=2;
+  let strong=g===4?[0,2]:g===3?[0]:[0,3];
+  if(g===6&&p.bits.indexOf('1')%2===0) strong=[0,2,3,4];
+  b.forEach((x,i)=>{ if(x&&!strong.includes(i)&&!b[i-1]) r+=1.5; });
+  const first=b.indexOf(true), last=b.lastIndexOf(true);
+  for(let i=first+1;i<last;i++) if(!b[i]&&b[i-1]) r+=.5;
+  if(g===6){ const s=p.bits, okH=h=>h==='100'||h==='111'||h==='000', dOk=okH(s.slice(0,3))&&okH(s.slice(3)), tOk=s.indexOf('1')%2===0; if(!dOk&&!tOk) r+=3; else if(!dOk) r+=1; }
+  return r;
+}
+const autoDiff=p=>Math.max(1,Math.min(10,Math.round(1+diffRaw(p))));
+let dEdit={}; try{ dEdit=JSON.parse(localStorage.getItem('rhythmdiff')||'{}'); }catch(e){}
+const saveD=()=>{ try{localStorage.setItem('rhythmdiff',JSON.stringify(dEdit))}catch(e){} };
+const diffOf=p=>dEdit[p.code]!=null?dEdit[p.code]:autoDiff(p);
+const band=d=>d<=3?1:d<=6?2:3;
+// path level: the level at which this pattern enters the teaching ladder (0 = not in the path)
+const PATH={"4:0000": 2, "4:1000": 1, "4:0010": 2, "4:1010": 1, "4:0001": 8, "4:0011": 5, "4:0100": 8, "4:0101": 9, "4:0110": 8, "4:0111": 5, "4:1001": 6, "4:1011": 5, "4:1100": 6, "4:1101": 7, "4:1110": 5, "4:1111": 3, "3:001": 5, "3:010": 5, "3:011": 3, "3:101": 2, "3:110": 3, "3:111": 1, "6:000001": 9, "6:000111": 7, "6:001111": 8, "6:011111": 9, "6:100111": 7, "6:101011": 7, "6:101110": 8, "6:101111": 8, "6:110110": 9, "6:110111": 8, "6:111010": 9, "6:111011": 8, "6:111100": 7, "6:111101": 9, "6:111110": 7, "6:111111": 7, "Q:101010": 4, "Q:101000": 6, "Q:100010": 6, "Q:100000": 6, "Q:001010": 6, "Q:001000": 6, "Q:000010": 6, "H:101010": 6};
+let lEdit={}; try{ lEdit=JSON.parse(localStorage.getItem('rhythmlvl')||'{}'); }catch(e){}
+const saveL=()=>{ try{localStorage.setItem('rhythmlvl',JSON.stringify(lEdit))}catch(e){} };
+const lvlOf=p=>lEdit[p.code]!=null?lEdit[p.code]:(PATH[p.code]||0);
+let filt='all';
+const fams=[
+  {id:'16',name:'רבעים, שמיניות ו־16־ות',g:4},
+  {id:'3',name:'טריולות',g:3},
+  {id:'6',name:'סקסטולות',g:6},
+  {id:'Q',name:'טריולת רבעים (2 פעמות)',long:2},
+  {id:'H',name:'טריולת חצאים (תיבה)',long:4},
+];
+const seen=new Set(), list={16:[],3:[],6:[],Q:[],H:[]};
+const cellsAll=[];
+['10','11','00'].forEach(a=>['10','11','00'].forEach(b=>['10','11','00'].forEach(c=>{ const x=a+b+c; if(x!=='000000') cellsAll.push(x); })));
+fams.forEach(f=>{
+  if(f.long){ cellsAll.forEach(bits=>list[f.id].push({code:`${f.id}:${bits}`,bits,long:f.long,hits:bits.split('1').length-1})); list[f.id].sort((a,b)=>autoDiff(a)-autoDiff(b)||a.hits-b.hits||(b.bits>a.bits?1:-1)); return; }
+  for(let m=0;m<(1<<f.g);m++){
+    const bits=[...Array(f.g)].map((_,i)=>(m>>(f.g-1-i))&1?'1':'0').join('');
+    const key=[...bits].map((b,i)=>b==='1'?i*12/f.g:null).filter(x=>x!==null).join(',');
+    if(seen.has(key)) continue; seen.add(key);
+    list[f.id].push({code:`${f.g}:${bits}`,bits,g:f.g,hits:bits.split('1').length-1});
+  }
+  list[f.id].sort((a,b)=>autoDiff(a)-autoDiff(b)||a.hits-b.hits||(b.bits>a.bits?1:-1));
+});
+let off=new Set();
+try{ off=new Set(JSON.parse(localStorage.getItem('rhythmmap')||'[]')); }catch(e){}
+const save=()=>{ try{localStorage.setItem('rhythmmap',JSON.stringify([...off]))}catch(e){} };
+// every way the app may write this beat, at the cleanest setting
+function variants(p){
+  if(p.long){ const bar=[{t:'L',k:p.long,g:6,slots:B(p.bits)}]; bar.seed=1; return [[svgBar(bar,'v',{num:p.long,den:4},p.long===2?300:470,{p:0,longBroken:false}),'']]; }
+  const bar=[{t:'q',k:1,g:p.g,slots:B(p.bits)}]; bar.seed=1;
+  if(p.g!==6) return [[svgBar(bar,'v',{num:1,den:4},150,{p:0}),'']];
+  const out=[], s=p.bits, okH=h=>h==='100'||h==='111'||h==='000';
+  const dOk=okH(s.slice(0,3))&&okH(s.slice(3)), tOk=s.indexOf('1')%2===0;
+  if(dOk) out.push([svgBar(bar,'v',{num:1,den:4},150,{p:0,feel:'d'}),'תחושה של 2']);
+  if(tOk) out.push([svgBar(bar,'v',{num:1,den:4},150,{p:0,feel:'t'}),'תחושה של 3']);
+  if(!dOk&&!tOk){
+    out.push([svgBar(bar,'v',{num:1,den:4},150,{p:0}),'תחושה של 2']);
+    out.push([svgBar(bar,'v',{num:1,den:4},150,{p:1,feel:'d'}),'2, עם הפסקות']);
+    out.push([svgBar(bar,'v',{num:1,den:4},150,{p:1,feel:'t'}),'3, עם הפסקות']);
+  }
+  return out;
+}
+function card(p){
+  const v=variants(p);
+  const body=v.map(([sv,name],i)=>(i?'<div class="or" style="opacity:.6">או</div>':'')+(name?`<div class="or" style="color:var(--accent)">${name}</div>`:'')+sv).join('');
+  const d=diffOf(p);
+  return `<div class="cell${p.long?' wide':''}" data-cell="${p.code}" data-band="${band(d)}"><button class="cardb${off.has(p.code)?' off':''}" data-c="${p.code}" aria-pressed="${off.has(p.code)}"><span class="code">${p.bits}</span><span class="tag">לא</span><div class="vars">${body}</div></button>
+    <div class="dl lv${band(d)}${dEdit[p.code]!=null?' edited':''}"><button data-dd="-1" data-k="${p.code}" aria-label="פחות קשה">−</button><span>קושי <b>${d}</b></span><button data-dd="1" data-k="${p.code}" aria-label="יותר קשה">+</button></div>
+    <div class="dl lp${lEdit[p.code]!=null?' edited':''}"><button data-ld="-1" data-k="${p.code}" aria-label="רמה נמוכה יותר">−</button><span>מסלול <b>${lvlOf(p)||'—'}</b></span><button data-ld="1" data-k="${p.code}" aria-label="רמה גבוהה יותר">+</button></div></div>`;
+}
+$('sections').innerHTML=fams.map(f=>`<section data-f="${f.id}"><div class="sh"><h2>${f.name}</h2><div class="secbtns"><small>${list[f.id].length} מקצבים</small><button class="mini" data-all="${f.id}" data-v="0">להשאיר הכל</button><button class="mini" data-all="${f.id}" data-v="1">להוציא הכל</button></div></div><div class="grid">${list[f.id].map(card).join('')}</div></section>`).join('');
+function upd(){ $('cnt').textContent=off.size; $('cntTxt').textContent=`מקצבים הוצאו · ${Object.keys(dEdit).length} ציונים · ${Object.keys(lEdit).length} רמות מסלול תוקנו`; $('out').hidden=true; }
+function applyFilter(){ document.querySelectorAll('.cell').forEach(el=>{ el.hidden=filt!=='all'&&el.dataset.band!==filt; }); }
+document.addEventListener('click',e=>{
+  const ld=e.target.closest('[data-ld]');
+  if(ld){ const k=ld.dataset.k, p=Object.values(list).flat().find(x=>x.code===k), nv=Math.max(0,Math.min(10,lvlOf(p)+ +ld.dataset.ld));
+    if(nv===(PATH[k]||0)) delete lEdit[k]; else lEdit[k]=nv; saveL();
+    const box=document.querySelector(`[data-cell="${k}"] .lp`); box.querySelector('b').textContent=nv||'—'; box.classList.toggle('edited',lEdit[k]!=null); upd(); return; }
+  const dd=e.target.closest('[data-dd]');
+  if(dd){ const k=dd.dataset.k, p=Object.values(list).flat().find(x=>x.code===k), nv=Math.max(1,Math.min(10,diffOf(p)+ +dd.dataset.dd));
+    if(nv===autoDiff(p)) delete dEdit[k]; else dEdit[k]=nv; saveD();
+    const cell=document.querySelector(`[data-cell="${k}"]`); const box=cell.querySelector('.dl'); box.querySelector('b').textContent=nv;
+    box.className=`dl lv${band(nv)}${dEdit[k]!=null?' edited':''}`; cell.dataset.band=band(nv); upd(); return; }
+  const fc=e.target.closest('.fchip');
+  if(fc){ filt=fc.dataset.f; document.querySelectorAll('.fchip').forEach(b=>b.setAttribute('aria-pressed',String(b===fc))); applyFilter(); return; }
+  const c=e.target.closest('.cardb');
+  if(c){ const k=c.dataset.c; off.has(k)?off.delete(k):off.add(k); c.classList.toggle('off',off.has(k)); c.setAttribute('aria-pressed',off.has(k)); save(); upd(); return; }
+  const a=e.target.closest('[data-all]');
+  if(a){ list[a.dataset.all].forEach(p=>{ a.dataset.v==='1'?off.add(p.code):off.delete(p.code); });
+    document.querySelectorAll(`section[data-f="${a.dataset.all}"] .cardb`).forEach(el=>{const o=off.has(el.dataset.c); el.classList.toggle('off',o); el.setAttribute('aria-pressed',o);}); save(); upd(); }
+});
+$('copy').onclick=()=>{
+  const eds=Object.entries(dEdit).sort().map(([k,v])=>`${k}=${v}`);
+  const lds=Object.entries(lEdit).sort().map(([k,v])=>`${k}=${v}`);
+  const txt='להוציא מהמחולל: '+([...off].sort().join(', ')||'כלום')+'\nקושי שתוקן: '+(eds.join(', ')||'כלום')+'\nרמות מסלול שתוקנו: '+(lds.join(', ')||'כלום');
+  const o=$('out'); o.value=txt; o.hidden=false;
+  const done=()=>{ $('copy').textContent='הועתק'; setTimeout(()=>$('copy').textContent='העתק רשימה',1600); };
+  try{ navigator.clipboard.writeText(txt).then(done,()=>{o.select();}); }catch(err){ o.select(); }
+};
+upd();
+})();
+</script>

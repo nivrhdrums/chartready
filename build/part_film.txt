@@ -1,0 +1,535 @@
+/* ---------- tap play-along: tap the pad with the notes, get scored ---------- */
+var TAP={exp:[],bars:[],good:0,ok:0,bad:0,miss:0,extra:0,offs:[],streak:0,best:0};
+var FILM={on:false,run:false,round:0,rounds:1,orig:null,stream:null,rec:null,chunks:[],recOn:false,ending:false,t0:0,raf:0,blob:null,url:null,cv:null,dest:null,destOn:false,micSrc:null,discard:false,ptrs:new Set(),lp:0,lastDraw:0};
+const tapLat=()=>ctx?(ctx.outputLatency||0)+(ctx.baseLatency||0):0;
+// event time on the audio clock, with the device's output delay taken off
+const tapTime=ev=>ctx.currentTime-Math.max(0,(performance.now()-ev.timeStamp)/1000)-tapLat();
+function tapOnNow(){ return !!S.tapOn&&S.tab==='gen'&&!(FILM&&FILM.on)&&!RC.remoteMode; }
+function tapUI(){ const on=!!S.tapOn&&S.tab==='gen'; $('pad').hidden=!on; $('tapStats').hidden=!on; tapShow(); requestAnimationFrame(fitScore); }
+function tapReset(){ Object.assign(TAP,{exp:[],bars:[],good:0,ok:0,bad:0,miss:0,extra:0,offs:[],streak:0,best:0}); tapShow(); }
+function tapExpect(t,id,k,bs,be){ TAP.exp.push({t,id,bk:k,done:false}); if(!TAP.bars.some(b=>b.k===k)) TAP.bars.push({k,start:bs,end:be,bad:false}); }
+function tapMark(id,c){ const el=$(id); if(el){ el.classList.remove('tg','ty','tx'); el.classList.add(c); } }
+function tapBad(k){ const b=TAP.bars.find(x=>x.k===k); if(b) b.bad=true; }
+function tapHit(ev){
+  if(!playing||!ctx||!tapOnNow()) return null;
+  const t=tapTime(ev)-(S.tapCal||0)/1000;
+  let best=null, bd=0.15;
+  TAP.exp.forEach(e=>{ if(e.done) return; const d=Math.abs(t-e.t); if(d<bd){ bd=d; best=e; } });
+  let cls;
+  if(best){
+    best.done=true; const d=t-best.t, a=Math.abs(d); TAP.offs.push(d);
+    if(a<=0.04){ TAP.good++; cls='tg'; } else if(a<=0.09){ TAP.ok++; cls='ty'; } else { TAP.bad++; cls='tx'; tapBad(best.bk); }
+    tapMark(best.id,cls);
+  } else {
+    const b=TAP.bars.find(x=>t>=x.start-0.05&&t<=x.end); if(!b) return 'tg';
+    TAP.extra++; b.bad=true; cls='tx';
+  }
+  tapShow(); return cls;
+}
+function tapSweep(){
+  const now=ctx.currentTime-tapLat()-(S.tapCal||0)/1000; let ch=false;
+  TAP.exp=TAP.exp.filter(e=>{ if(e.done) return false; if(now>e.t+0.15){ TAP.miss++; tapMark(e.id,'tx'); tapBad(e.bk); ch=true; return false; } return true; });
+  TAP.bars=TAP.bars.filter(b=>{ if(now>b.end+0.16){ if(b.bad) TAP.streak=0; else { TAP.streak++; TAP.best=Math.max(TAP.best,TAP.streak); } ch=true; return false; } return true; });
+  if(ch) tapShow();
+}
+function tapNums(){
+  const tot=TAP.good+TAP.ok+TAP.bad+TAP.miss+TAP.extra, acc=tot?Math.round(100*(TAP.good+0.6*TAP.ok+0.2*TAP.bad)/tot):null;
+  const m=TAP.offs.length?TAP.offs.reduce((a,b)=>a+b,0)/TAP.offs.length*1000:0;
+  return {tot,acc,m,has:TAP.offs.length>0};
+}
+function tapShow(){
+  if(!$('tapStats')||$('tapStats').hidden) return;
+  const {acc,m,has}=tapNums(), mid=!has||Math.abs(m)<8;
+  $('tAcc').textContent=acc==null?'—':acc+'%';
+  // tendency as a dot on a small meter: left = early, right = late
+  const tm=$('tTend'); tm.classList.toggle('none',!has); tm.firstChild.style.left=(has?50+clamp(m/90,-1,1)*44:50)+'%';
+  $('tOffL').textContent=!has?'נטייה':mid?'בזמן':m<0?'מקדים':'מאחר';
+  $('tStreak').textContent=TAP.streak; $('tBest').textContent=TAP.best;
+}
+function tapSummary(){
+  const {tot,acc,m,has}=tapNums(); if(!tot) return;
+  const lean=!has||Math.abs(m)<8?'בזמן':m<0?'נוטה להקדים':'נוטה לאחר';
+  toast(`${acc}% דיוק · ${lean} · שיא רצף ${TAP.best}`);
+}
+function ripple(box,ev,cls){ const r=box.getBoundingClientRect(), i=document.createElement('i'); if(cls) i.className=cls; i.style.left=(ev.clientX-r.left)+'px'; i.style.top=(ev.clientY-r.top)+'px'; box.appendChild(i); setTimeout(()=>i.remove(),400); }
+$('pad').addEventListener('pointerdown',ev=>{
+  ev.preventDefault();
+  const cls=tapHit(ev); ripple($('pad'),ev,cls);
+  if(cls){ const p=$('pad'); p.classList.remove('tg','ty','tx'); p.classList.add(cls); clearTimeout(p._t); p._t=setTimeout(()=>p.classList.remove('tg','ty','tx'),160); }
+},{passive:false});
+
+/* calibration: 4 clicks to listen, then 8 taps with the click; the median offset is stored */
+let CAL=null;
+function calOpen(){ if(playing) stop(); closeSheet(); $('calScr').hidden=false; calGo(); }
+function calClose(){ CAL=null; $('calScr').hidden=true; }
+async function calGo(){
+  await initAudio(); applyVol();
+  $('calRun').hidden=false; $('calRes').hidden=true; $('calBad').hidden=true; $('calActs').hidden=true;
+  const bd=0.6, t0=ctx.currentTime+0.7, n=13, clicks=[];
+  for(let i=0;i<n;i++){ const t=t0+i*bd; clicks.push(t); click(t,i%4?'beat':'acc'); }
+  CAL={clicks,offs:[],end:t0+n*bd+0.25}; calDots();
+  const chk=()=>{ if(!CAL) return; if(ctx.currentTime>CAL.end||CAL.offs.length>=8) return calDone(); setTimeout(chk,100); }; chk();
+}
+function calDots(){ const k=CAL?CAL.offs.length:0; $('calDots').innerHTML=[...Array(8)].map((_,i)=>`<i class="${i<k?'on':i===k?'cur':''}"></i>`).join(''); }
+$('calPad').addEventListener('pointerdown',ev=>{
+  ev.preventDefault(); if(!CAL) return; ripple($('calPad'),ev);
+  const t=tapTime(ev); let best=null, bd=1;
+  CAL.clicks.forEach((c,i)=>{ if(i<4) return; const d=Math.abs(t-c); if(d<bd){ bd=d; best=c; } });
+  if(best!=null&&bd<0.25) CAL.offs.push(t-best); calDots();
+},{passive:false});
+function calDone(){
+  const o=CAL.offs.slice().sort((a,b)=>a-b); CAL=null; $('calRun').hidden=true; $('calActs').hidden=false;
+  if(o.length<6){ $('calBad').hidden=false; return; }
+  const med=o[Math.floor(o.length/2)], spread=o[o.length-2]-o[1];
+  if(spread>0.12){ $('calBad').hidden=false; $('calBadT').textContent='ההקשות היו מפוזרות מדי. נסה שוב, בנחת'; return; }
+  S.tapCal=Math.round(med*1000); save(); $('calRes').hidden=false;
+}
+$('tapCalBtn').onclick=calOpen; $('calX').onclick=calClose; $('calDone').onclick=calClose; $('calAgain').onclick=calGo;
+
+/* ---------- filming mode: a clean 9:16 screen, optionally recorded in the app ---------- */
+function fmSync(){
+  $('fmCamRow').hidden=false; $('fmMicRow').hidden=!S.fmRec; // the camera also shows on screen for the phone's own screen recording $('fmRecHint').hidden=true;
+  $('fmRoundsF').hidden=S.fmMode==='one'; $('fmStepF').hidden=S.fmMode!=='bpm';
+  $('fmRoundsV').textContent=S.fmRounds; $('fmStepV').textContent='+'+(S.fmStep||10);
+  $('fmModeHint').textContent=S.fmMode==='lvl'?`מהמורכבות הנוכחית (${S.level}) ועד 10.`:S.fmMode==='bpm'?`מ־⁦${S.bpm} BPM⁩ ועוד ${S.fmStep||10} בכל סבב.`:'מקצב אחד בהגדרות הנוכחיות.';
+}
+['fmClean','fmRec','fmCam','fmMic','fmCount','tapOn'].forEach(k=>{ const el=$(k); el.checked=!!S[k]; el.onchange=()=>{ S[k]=el.checked; save(); fmSync(); tapUI(); }; });
+['fmTitle','fmHandle','fmEnd'].forEach(k=>{ const el=$(k); el.value=S[k]||''; el.oninput=()=>{ S[k]=el.value; save(); }; });
+chips('fmMode',[{v:'lvl',t:'עולה ברמה'},{v:'bpm',t:'עולה בטמפו'},{v:'one',t:'סבב אחד'}],'fmMode',fmSync);
+$('fmSec').addEventListener('click',e=>{ const b=e.target.closest('[data-fm]'); if(!b) return; const k=b.dataset.fm; S[k]=k==='fmRounds'?clamp(S[k]+ +b.dataset.d,2,20):clamp((S[k]||10)+ +b.dataset.d,1,50); save(); fmSync(); });
+fmSync();
+
+function filmApply(i){
+  const o=FILM.orig, n=FILM.rounds=S.fmMode==='one'?1:S.fmRounds;
+  S.level=o.level; S.bpm=o.bpm;
+  if(S.fmMode==='lvl'&&n>1) S.level=Math.round(o.level+(10-o.level)*i/(n-1));
+  if(S.fmMode==='bpm') S.bpm=clamp(o.bpm+i*(S.fmStep||10),1,400);
+}
+function filmMeta(){
+  const n=FILM.rounds, i=Math.min(FILM.round,n-1), B=`⁦${S.bpm} BPM⁩`;
+  $('fHandle').textContent=S.fmHandle||''; $('fHandle').hidden=!S.fmHandle;
+  $('fChal').textContent=(S.fmTitle||'').replace(/\{BPM\}/gi,S.bpm); $('fChal').hidden=!S.fmTitle;
+  $('fRoundMain').textContent=S.fmMode==='bpm'?B:`רמה ${S.level}`;
+  $('fRoundSub').textContent=(n>1?`סבב ${i+1} / ${n} · `:'')+(S.fmMode==='bpm'?`רמה ${S.level}`:B);
+}
+function filmFresh(){ FILM.round=0; filmApply(0); rhythm=genRhythm(); render(); filmMeta(); $('fProg').style.width='0%'; requestAnimationFrame(fitScore); }
+function filmOpen(){
+  if(!RCS.unlocked) return;
+  if(RC.remoteMode){ toast('מצב צילום עובד רק על המכשיר שמנגן'); return; }
+  S.fmRec=true; S.fmClean=false;
+  if(playing) stop();
+  FILM.on=true; FILM.orig={level:S.level,bpm:S.bpm,bars:S.bars}; S.bars=S.fmBars||4;
+  $('fScoreSlot').appendChild($('score'));
+  $('film').hidden=false; $('fRes').hidden=true; $('fEnd').hidden=true; $('fCd').hidden=true; $('fRec').hidden=true; $('fCtl').hidden=false;
+  $('fGo').textContent=S.fmRec?'⏺ התחל הקלטה':'▶ התחל';
+  $('fCam').classList.remove('ghost');
+  filmFresh();
+  $('fFrame').classList.toggle('half',S.fmLay==='half'&&S.fmCam);
+  if(S.fmCam||(S.fmRec&&S.fmMic)) filmMedia();
+}
+async function filmMedia(){
+  if(FILM.stream) return;
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw new Error('no media');
+    FILM.stream=await navigator.mediaDevices.getUserMedia({
+      video:S.fmCam?{facingMode:S.fmFacing||'user',width:{ideal:720},height:{ideal:960}}:false,
+      audio:(S.fmRec&&S.fmMic)?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false});
+    if(!FILM.on){ FILM.stream.getTracks().forEach(t=>t.stop()); FILM.stream=null; return; }
+    if(FILM.stream.getVideoTracks().length){ $('fVid').srcObject=FILM.stream; $('fCam').hidden=false; if(S.fmCamPos){ $('fCam').style.left=S.fmCamPos.l; $('fCam').style.top=S.fmCamPos.t; $('fCam').style.bottom='auto'; } try{ await $('fVid').play(); }catch(e){} }
+  }catch(e){ FILM.stream=null; toast('אין גישה למצלמה. באייפון: הגדרות › Safari › מצלמה › אפשר'); }
+}
+async function filmGo(){
+  if(FILM.run) return;
+  FILM.ptrs.clear();
+  await initAudio(); applyVol();
+  $('fCtl').hidden=true; $('fStop').hidden=false; $('fRes').hidden=true; $('fEnd').hidden=true;
+  filmFresh();
+  $('fCam').classList.toggle('ghost',!!(S.fmClean&&S.fmRec)); // hide the preview only when the app itself records it
+  if(S.fmRec&&filmRecStart()) $('fRec').hidden=!!S.fmClean;
+  FILM.run=true; FILM.ending=false;
+  await start();
+}
+function filmNextLoop(start){
+  if(cur.kind==='count'){ beginGenLoop(start,0); return; }
+  FILM.round++;
+  if(FILM.round>=FILM.rounds){ cur={kind:'end',start,bd:1,len:0,ev:[],idx:0}; visQ.push({t:start,fn:filmEnd}); return; }
+  filmApply(FILM.round); const r=genRhythm(); rhythm=r;
+  visQ.push({t:start,fn:()=>{ render(r); filmMeta(); }});
+  if(S.fmCount) cur=makeLoop('count',start); else beginGenLoop(start,0);
+}
+function filmCount(k){ const c=$('fCd'); c.textContent=k; c.hidden=false; }
+function filmProg(){
+  if(!cur) return; const n=FILM.rounds; let f=0;
+  if(cur.kind==='gen'&&cur.len) f=clamp((ctx.currentTime-cur.start)/(cur.len*cur.bd),0,1);
+  const done=cur.kind==='end'?n:Math.min(FILM.round,n-1)+f;
+  $('fProg').style.width=(100*done/n).toFixed(1)+'%';
+}
+function filmEnd(){ if(ctx) filmMark('end',ctx.currentTime); $('fProg').style.width='100%'; $('fEndT').textContent=S.fmEnd||''; $('fEnd').hidden=!S.fmEnd; FILM.ending=true; stop(); }
+// playback stopped inside filming mode: natural end keeps the end card in the video for a moment
+function filmStopped(){
+  FILM.run=false; $('fCd').hidden=true; $('fStop').hidden=true;
+  const fin=()=>{ if(FILM.recOn) filmRecStop(false); if(!FILM.on) return; $('fCtl').hidden=false; $('fGo').textContent=S.fmRec?'⏺ צלם שוב':'▶ שוב'; $('fCam').classList.remove('ghost'); };
+  if(FILM.ending) setTimeout(fin,2500); else fin();
+}
+function filmAbort(){ if(FILM.run){ FILM.ending=false; stop(); } }
+function filmExit(){
+  if(FILM.run){ FILM.ending=false; stop(); }
+  if(FILM.recOn) filmRecStop(true);
+  if(FILM.micSrc){ try{ FILM.micSrc.disconnect(); }catch(e){} FILM.micSrc=null; }
+  if(FILM.stream){ FILM.stream.getTracks().forEach(t=>t.stop()); FILM.stream=null; }
+  $('fVid').srcObject=null; $('fCam').hidden=true;
+  FILM.on=false; $('film').hidden=true; $('fRes').hidden=true; if(FILM.orig&&FILM.orig.bars){ S.bars=FILM.orig.bars; save(); }
+  $('screen').insertBefore($('score'),$('pad'));
+  S.level=FILM.orig.level; setBpm(FILM.orig.bpm); save(); updateQuick();
+  rhythm=genRhythm(); render(); requestAnimationFrame(fitScore);
+  if(FILM.url){ URL.revokeObjectURL(FILM.url); FILM.url=null; FILM.blob=null; }
+}
+function filmKey(e){
+  if(e.code==='Escape'){ FILM.run?filmAbort():filmExit(); }
+  else if(e.code==='Space'&&!/INPUT|SELECT/.test(e.target.tagName)){ e.preventDefault(); FILM.run?filmAbort():filmGo(); }
+}
+// the camera button is always there; without the secret it shakes, and a second tap offers the secret
+let filmTaps=0, filmTapT=0;
+$('filmBtn').onclick=()=>{
+  if(RCS.unlocked) return fsOpen();
+  const b=$('filmBtn'), n=performance.now(); filmTaps=n-filmTapT<4000?filmTaps+1:1; filmTapT=n;
+  b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); try{ navigator.vibrate&&navigator.vibrate([20,40,20]); }catch(e){}
+  if(filmTaps>=2) toast('סודי',{ico:'🔒',icoBg:'#1f1710',label:'פתח',act:secretAsk,ms:4000});
+};
+$('fGo').onclick=filmGo;
+$('fStop').onclick=e=>{ e.stopPropagation(); filmAbort(); };
+$('fExit').onclick=filmExit;
+$('fResClose').onclick=()=>{ $('fRes').hidden=true; };
+$('fSave').onclick=filmSave;
+// stop while running: two fingers, or a long press anywhere
+$('film').addEventListener('pointerdown',e=>{
+  FILM.ptrs.add(e.pointerId);
+  if(!FILM.run) return;
+  if(FILM.ptrs.size>=2){ filmAbort(); return; }
+  clearTimeout(FILM.lp); FILM.lp=setTimeout(filmAbort,800);
+});
+['pointerup','pointercancel'].forEach(n=>$('film').addEventListener(n,e=>{ FILM.ptrs.delete(e.pointerId); clearTimeout(FILM.lp); }));
+// drag the camera bubble to any spot before starting
+(()=>{ const c=$('fCam'); let d=null;
+  c.addEventListener('pointerdown',e=>{ if(FILM.run) return; e.stopPropagation(); const r=c.getBoundingClientRect(); d={dx:e.clientX-r.left,dy:e.clientY-r.top}; c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove',e=>{ if(!d) return; const f=$('fFrame').getBoundingClientRect(), r=c.getBoundingClientRect();
+    const x=clamp(e.clientX-f.left-d.dx,0,f.width-r.width), y=clamp(e.clientY-f.top-d.dy,0,f.height-r.height);
+    c.style.left=(100*x/f.width)+'%'; c.style.top=(100*y/f.height)+'%'; c.style.bottom='auto'; });
+  c.addEventListener('pointerup',()=>{ if(d){ S.fmCamPos={l:c.style.left,t:c.style.top}; save(); } d=null; });
+})();
+
+/* recording: the frame is painted onto a 1080x1920 canvas every frame, mixed with the app sound and the mic */
+// the frame and the camera are recorded as two files, so the camera and the texts can still be moved after filming
+const REC_TYPES=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+const CAM_TYPES=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+const pickType=L=>L.find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
+function filmRecStart(){
+  if(!window.MediaRecorder){ toast('הדפדפן הזה לא תומך בהקלטה'); return false; }
+  const cv=FILM.cv||(FILM.cv=document.createElement('canvas')); cv.width=1080; cv.height=1920;
+  if(!cv.captureStream){ toast('הדפדפן הזה לא תומך בהקלטה'); return false; }
+  const camOn=!!(FILM.stream&&FILM.stream.getVideoTracks().length);
+  ['fChal','fHandle','fEnd'].forEach(id=>$(id).setAttribute('data-norec',''));
+  if(camOn) $('fCam').setAttribute('data-norec','');
+  filmDraw();
+  const vs=cv.captureStream(30);
+  if(!FILM.dest){ FILM.dest=ctx.createMediaStreamDestination(); FILM.dest.channelCount=2; FILM.merge=ctx.createChannelMerger(2); FILM.merge.connect(FILM.dest); }
+  if(!FILM.destOn){ master.connect(FILM.merge,0,0); FILM.destOn=true; }
+  if(FILM.stream&&FILM.stream.getAudioTracks().length&&!FILM.micSrc){ FILM.micSrc=ctx.createMediaStreamSource(FILM.stream); FILM.micSrc.connect(FILM.merge,0,1); }
+  const ms=new MediaStream([...vs.getVideoTracks(),...FILM.dest.stream.getAudioTracks()]);
+  const mt=pickType(REC_TYPES);
+  let rec, crec=null; try{ rec=new MediaRecorder(ms,mt?{mimeType:mt,videoBitsPerSecond:8e6}:{videoBitsPerSecond:8e6}); }catch(e){ toast('לא הצלחתי להתחיל הקלטה'); return false; }
+  if(camOn){ const ct=pickType(CAM_TYPES); try{ crec=new MediaRecorder(new MediaStream(FILM.stream.getVideoTracks()),ct?{mimeType:ct,videoBitsPerSecond:5e6}:{videoBitsPerSecond:5e6}); }catch(e){ crec=null; } }
+  FILM.chunks=[]; FILM.camChunks=[]; FILM.discard=false; FILM.pending=crec?2:1;
+  const fr=$('fFrame').getBoundingClientRect(), sr=$('fScoreSlot').getBoundingClientRect(), cr=$('fCam').getBoundingClientRect();
+  FILM.meta={t0:ctx.currentTime,beats:[],rounds:[],firstPlay:null,endAt:null,scoreTop:(sr.top-fr.top)/fr.height,scoreBot:(sr.bottom-fr.top)/fr.height,scoreL:(sr.left-fr.left)/fr.width,scoreR:(sr.right-fr.left)/fr.width,rounds_total:S.fmMode==='one'?1:S.fmRounds,
+    cam:camOn?{x:(cr.left-fr.left)/fr.width,y:(cr.top-fr.top)/fr.height,w:cr.width/fr.width}:null,camW:0,camH:0};
+  if(camOn){ const v=$('fVid'); FILM.meta.camW=v.videoWidth; FILM.meta.camH=v.videoHeight; }
+  rec.ondataavailable=e=>{ if(e.data&&e.data.size) FILM.chunks.push(e.data); };
+  rec.onstop=()=>{ FILM.recType=(rec.mimeType||mt||'video/webm'); filmRecDone(); };
+  if(crec){ crec.ondataavailable=e=>{ if(e.data&&e.data.size) FILM.camChunks.push(e.data); }; crec.onstop=()=>{ FILM.camType=crec.mimeType||'video/webm'; filmRecDone(); }; }
+  FILM.rec=rec; FILM.crec=crec; FILM.recOn=true; FILM.t0=performance.now(); rec.start(1000); if(crec) crec.start(1000);
+  filmLoop(); return true;
+}
+const filmMark=(k,t)=>{ if(FILM.recOn&&FILM.meta) { const x=t-FILM.meta.t0; if(k==='beat') FILM.meta.beats.push(x); else if(k==='play'){ if(FILM.meta.firstPlay==null) FILM.meta.firstPlay=x; FILM.meta.rounds.push({t:x,bpm:S.bpm,lv:S.level}); } else if(k==='end') FILM.meta.endAt=x; } };
+function filmLoop(){
+  if(!FILM.recOn) return;
+  const n=performance.now();
+  if(n-FILM.lastDraw>30){ FILM.lastDraw=n; filmDraw(); $('fRecT').textContent=`REC ${fmt((n-FILM.t0)/1000)}`; }
+  FILM.raf=requestAnimationFrame(filmLoop);
+}
+function filmRecStop(discard){ FILM.recOn=false; FILM.discard=!!discard; cancelAnimationFrame(FILM.raf); $('fRec').hidden=true; ['fChal','fHandle','fEnd','fCam'].forEach(id=>$(id).removeAttribute('data-norec'));
+  [FILM.rec,FILM.crec].forEach(r=>{ try{ r&&r.state!=='inactive'&&r.stop(); }catch(e){} }); }
+function filmRecDone(){
+  if(--FILM.pending>0) return;
+  if(FILM.discard||!FILM.chunks.length) return;
+  const base=new Blob(FILM.chunks,{type:FILM.recType.split(';')[0]}), cam=FILM.camChunks.length?new Blob(FILM.camChunks,{type:FILM.camType.split(';')[0]}):null;
+  FILM.meta.dur=(performance.now()-FILM.t0)/1000;
+  if(FILM.on) edOpen(base,cam,FILM.meta);
+}
+async function filmSave(){
+  const b=FILM.blob; if(!b) return; filmShare(b,FILM.url);
+}
+async function filmShare(b,url){
+  const ext=b.type.includes('mp4')?'mp4':'webm', name=`chartready-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.${ext}`;
+  try{ const file=new File([b],name,{type:b.type}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'ChartReady'}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  $('fResHint').textContent='אם ההורדה לא התחילה: לחיצה ארוכה על הווידאו ושמירה.';
+}
+
+// paint the live frame (boxes, text and the notation SVG) onto the canvas
+let FR=null;
+const visCol=c=>!!c&&c!=='transparent'&&c!=='none'&&!/rgba\([^)]*,\s*0\)$/.test(c);
+function rrP(p,x,y,w,h,r){ r=Math.max(0,Math.min(r,w/2,h/2)); p.moveTo(x+r,y); p.arcTo(x+w,y,x+w,y+h,r); p.arcTo(x+w,y+h,x,y+h,r); p.arcTo(x,y+h,x,y,r); p.arcTo(x,y,x+w,y,r); p.closePath(); }
+function filmDraw(){
+  const cv=FILM.cv, g=cv.getContext('2d'), fr=$('fFrame').getBoundingClientRect(); if(!fr.width) return;
+  FR={g,ox:fr.left,oy:fr.top,sc:cv.width/fr.width};
+  g.setTransform(1,0,0,1,0,0); g.globalAlpha=1; g.fillStyle=getComputedStyle($('fFrame')).backgroundColor; g.fillRect(0,0,cv.width,cv.height);
+  drawNode($('fFrame'));
+}
+const baseT=()=>FR.g.setTransform(FR.sc,0,0,FR.sc,-FR.ox*FR.sc,-FR.oy*FR.sc);
+function drawNode(el){
+  if(el.hasAttribute('data-norec')) return;
+  const cs=getComputedStyle(el); if(cs.display==='none'||cs.visibility==='hidden') return;
+  if(el.id==='fCam'){ drawCam(el,cs); return; }
+  if(el.tagName.toLowerCase()==='svg'){ drawSvg(el); return; }
+  paintBox(el,cs);
+  for(const ch of el.childNodes){ if(ch.nodeType===1) drawNode(ch); else if(ch.nodeType===3) drawText(ch,cs); }
+}
+function paintBox(el,cs){
+  const bg=cs.backgroundColor, bw=parseFloat(cs.borderTopWidth)||0, bc=cs.borderTopColor, hasB=bw>0&&cs.borderTopStyle!=='none'&&visCol(bc);
+  if(!visCol(bg)&&!hasB) return;
+  const g=FR.g, r=el.getBoundingClientRect(); if(!r.width||!r.height) return;
+  let rad=cs.borderTopLeftRadius; rad=rad.endsWith('%')?Math.min(r.width,r.height)*parseFloat(rad)/100:(parseFloat(rad)||0);
+  baseT(); g.globalAlpha=+cs.opacity;
+  if(visCol(bg)){ g.fillStyle=bg; g.beginPath(); rrP(g,r.left,r.top,r.width,r.height,rad); g.fill(); }
+  if(hasB){ g.strokeStyle=bc; g.lineWidth=bw; g.beginPath(); rrP(g,r.left+bw/2,r.top+bw/2,r.width-bw,r.height-bw,Math.max(0,rad-bw/2)); g.stroke(); }
+  g.globalAlpha=1;
+}
+const txtRange=document.createRange();
+function drawText(node,cs){
+  const s=node.textContent; if(!s.trim()) return;
+  const g=FR.g, re=/\S+/g; let m;
+  baseT(); g.globalAlpha=+cs.opacity;
+  g.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; g.fillStyle=cs.color; g.textAlign='center'; g.textBaseline='middle'; g.direction=cs.direction;
+  if(cs.textShadow&&cs.textShadow!=='none'){ g.shadowColor='rgba(0,0,0,.8)'; g.shadowBlur=12*FR.sc; }
+  while((m=re.exec(s))){ txtRange.setStart(node,m.index); txtRange.setEnd(node,m.index+m[0].length); const r=txtRange.getBoundingClientRect(); if(!r.width) continue; g.fillText(m[0],r.left+r.width/2,r.top+r.height/2); }
+  g.shadowBlur=0; g.shadowColor='transparent'; g.globalAlpha=1;
+}
+function drawSvg(svg){
+  const {g,ox,oy,sc}=FR;
+  svg.querySelectorAll('line,rect,path,ellipse,text').forEach(el=>{
+    const cs=getComputedStyle(el); if(cs.display==='none'||cs.visibility==='hidden') return;
+    const m=el.getScreenCTM(); if(!m) return;
+    g.setTransform(sc*m.a,sc*m.b,sc*m.c,sc*m.d,sc*(m.e-ox),sc*(m.f-oy));
+    g.globalAlpha=(+cs.opacity)*(cs.fillOpacity!==''?+cs.fillOpacity:1);
+    const fill=cs.fill, stroke=cs.stroke, sw=parseFloat(cs.strokeWidth)||0, tag=el.tagName.toLowerCase();
+    const doFill=visCol(fill)&&tag!=='line', doStroke=visCol(stroke)&&sw>0;
+    if(cs.filter&&cs.filter!=='none'&&doFill){ g.shadowColor=fill; g.shadowBlur=6*sc; }
+    if(tag==='text'){
+      const an=cs.textAnchor; g.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      g.textAlign=an==='middle'?'center':an==='end'?'right':'left'; g.textBaseline='alphabetic'; g.direction='ltr';
+      const x=el.x.baseVal.length?el.x.baseVal.getItem(0).value:0, y=el.y.baseVal.length?el.y.baseVal.getItem(0).value:0, t=el.textContent;
+      if(doStroke){ g.lineWidth=sw; g.strokeStyle=stroke; g.lineJoin='round'; g.strokeText(t,x,y); }
+      if(doFill){ g.fillStyle=fill; g.fillText(t,x,y); }
+    } else {
+      const p=new Path2D();
+      if(tag==='line'){ p.moveTo(el.x1.baseVal.value,el.y1.baseVal.value); p.lineTo(el.x2.baseVal.value,el.y2.baseVal.value); }
+      else if(tag==='rect'){ const x=el.x.baseVal.value,y=el.y.baseVal.value,w=el.width.baseVal.value,h=el.height.baseVal.value,r=el.rx.baseVal.value||el.ry.baseVal.value||0; if(r) rrP(p,x,y,w,h,r); else p.rect(x,y,w,h); }
+      else if(tag==='ellipse'){ p.ellipse(el.cx.baseVal.value,el.cy.baseVal.value,el.rx.baseVal.value,el.ry.baseVal.value,0,0,Math.PI*2); }
+      else p.addPath(new Path2D(el.getAttribute('d')||''));
+      if(doFill){ g.fillStyle=fill; g.fill(p); }
+      if(doStroke){ g.lineWidth=sw; g.strokeStyle=stroke; g.lineCap=cs.strokeLinecap||'butt'; g.stroke(p); }
+    }
+    g.shadowBlur=0; g.shadowColor='transparent'; g.globalAlpha=1;
+  });
+}
+function drawCam(el,cs){
+  const v=$('fVid'); if(!v.videoWidth) return;
+  const g=FR.g, r=el.getBoundingClientRect(), rad=Math.min(r.width/2,/%$/.test(cs.borderTopLeftRadius)?r.width*parseFloat(cs.borderTopLeftRadius)/100:(parseFloat(cs.borderTopLeftRadius)||0)), bw=parseFloat(cs.borderTopWidth)||0;
+  baseT(); g.save(); g.beginPath(); rrP(g,r.left,r.top,r.width,r.height,rad); g.clip();
+  const s=Math.max(r.width/v.videoWidth,r.height/v.videoHeight), dw=v.videoWidth*s, dh=v.videoHeight*s;
+  g.translate(r.left+r.width/2,r.top+r.height/2); g.scale(-1,1); g.drawImage(v,-dw/2,-dh/2,dw,dh); g.restore();
+  if(bw){ baseT(); g.strokeStyle=cs.borderTopColor; g.lineWidth=bw; g.beginPath(); rrP(g,r.left+bw/2,r.top+bw/2,r.width-bw,r.height-bw,Math.max(0,rad-bw/2)); g.stroke(); }
+}
+
+/* ---------- reading history: every bar that was shown, the last 5 runs, kept on this device ---------- */
+var HIST={runs:[],pend:[],slot:[],cur:null,sel:new Set(),open:null};
+try{ const h=JSON.parse(localStorage.getItem('cr_hist')||'null'); if(h&&Array.isArray(h.runs)) HIST.runs=h.runs; }catch(e){}
+function histSave(){ try{ localStorage.setItem('cr_hist',JSON.stringify({runs:HIST.runs})); }catch(e){} }
+const histOff=()=>!!((FILM&&FILM.on)||RC.remoteMode||RC.applying);
+const histEntry=(bar,r)=>({b:bar.map(x=>({t:x.t,k:x.k,g:x.g,slots:x.slots.slice()})),s:bar.seed||1,n:r.num,d:r.den,ne:!!bar.noExt,a:bar.acc||null,p:false});
+const histBar=e=>{ const b=e.b.map(x=>Object.assign({},x,{slots:x.slots.slice()})); b.seed=e.s; if(e.ne) b.noExt=true; if(e.a) b.acc=e.a.slice(); return b; };
+function histPush(i,bar,r){
+  if(histOff()) return;
+  const e=histEntry(bar,r); HIST.slot[i]=e;
+  const L=HIST.cur&&playing?HIST.cur.bars:HIST.pend; L.push(e); if(L.length>200) L.shift();
+}
+// a run starts at play: it takes what was drawn while stopped, or the bars on screen when nothing new was drawn
+function histStart(){
+  if(histOff()||S.tab!=='gen') return;
+  let bars=HIST.pend; HIST.pend=[];
+  if(!bars.length&&rhythm) bars=shown.map((b,i)=>{ const e=histEntry(b,rhythm); HIST.slot[i]=e; return e; });
+  HIST.cur={t:Date.now(),bpm:S.bpm,st:styleName(),lv:S.level,num:rhythm.num,den:rhythm.den,bars};
+  HIST.runs.push(HIST.cur); while(HIST.runs.length>5) HIST.runs.shift();
+}
+function histStop(){ if(HIST.cur){ HIST.cur=null; histSave(); } }
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) histSave(); });
+function histWhen(t){
+  const d=new Date(t), now=new Date(), p=n=>String(n).padStart(2,'0'), hm=`${p(d.getHours())}:${p(d.getMinutes())}`;
+  const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(), diff=Math.round((day(now)-day(d))/864e5);
+  return diff===0?`היום ${hm}`:diff===1?`אתמול ${hm}`:`${d.getDate()}/${d.getMonth()+1} ${hm}`;
+}
+function histRender(){
+  const L=$('histList'); L.innerHTML='';
+  // null: the newest run opens; -1: every run closed
+  if(HIST.open==null||HIST.open>=HIST.runs.length) HIST.open=HIST.runs.length-1;
+  if(!HIST.runs.length) L.innerHTML='<div class="hint">עוד אין היסטוריה. היא מתמלאת כשמנגנים בטאב קריאה.</div>';
+  for(let ri=HIST.runs.length-1;ri>=0;ri--){
+    const run=HIST.runs[ri], open=ri===HIST.open, box=document.createElement('div');
+    box.className='hrun'+(open?' open':'');
+    box.innerHTML=`<button class="hrh" data-r="${ri}"><span>${ri===HIST.runs.length-1?'ריצה אחרונה · ':''}${histWhen(run.t)} <i>${open?'▴':'▾'}</i></span><small>⁦${run.bpm} BPM⁩ · ${esc(run.st)} · מורכבות ${run.lv} · ${run.bars.length} תיבות</small></button><div class="hbars"></div>`;
+    L.appendChild(box);
+    if(open) histFill(box.querySelector('.hbars'),ri,0);
+  }
+  histFoot();
+}
+// newest first, 20 at a time as the list scrolls
+function histFill(el,ri,from){
+  const run=HIST.runs[ri], n=run.bars.length, idx=[];
+  for(let k=from;k<Math.min(n,from+20);k++) idx.push(n-1-k);
+  if(!idx.length) return;
+  const bars=idx.map(i=>histBar(run.bars[i])), W=widthFor({bars,num:run.num,den:run.den});
+  el.insertAdjacentHTML('beforeend',idx.map((i,j)=>{ const e=run.bars[i];
+    return `<button class="hb${e.p?'':' unplayed'}${HIST.sel.has(ri+':'+i)?' sel':''}" data-k="${ri}:${i}"><span class="hn">${i+1}</span>${svgBar(bars[j],`h${ri}_${i}`,{num:e.n||run.num,den:e.d||run.den},W)}</button>`; }).join(''));
+  if(from+20<n){ const s=document.createElement('div'); s.className='hmore'; el.appendChild(s);
+    const io=new IntersectionObserver(es=>{ if(es.some(x=>x.isIntersecting)){ io.disconnect(); s.remove(); histFill(el,ri,from+20); } }); io.observe(s); }
+}
+function histFoot(){
+  const n=HIST.sel.size;
+  $('histLoad').disabled=!n; $('histLoad').textContent=n?`טען לתרגול · ${n}`:'טען לתרגול';
+  $('histUnsel').disabled=!n; $('histClear').disabled=!HIST.runs.length;
+}
+$('histList').onclick=e=>{
+  const h=e.target.closest('.hrh'), b=e.target.closest('.hb');
+  if(h){ const ri=+h.dataset.r; HIST.open=HIST.open===ri?-1:ri; histRender(); return; }
+  if(b){ const k=b.dataset.k; if(HIST.sel.has(k)) HIST.sel.delete(k); else HIST.sel.add(k); b.classList.toggle('sel',HIST.sel.has(k)); histFoot(); }
+};
+$('histUnsel').onclick=()=>{ HIST.sel.clear(); $('histList').querySelectorAll('.hb.sel').forEach(b=>b.classList.remove('sel')); histFoot(); };
+$('histClear').onclick=()=>askDel('כל ההיסטוריה',()=>{ HIST.runs=[]; HIST.sel.clear(); HIST.open=null; histSave(); histRender(); });
+// loaded bars repeat until "new rhythm" is pressed
+$('histLoad').onclick=()=>{
+  const keys=[...HIST.sel].map(k=>k.split(':').map(Number)).filter(([ri,i])=>HIST.runs[ri]&&HIST.runs[ri].bars[i]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  if(!keys.length) return;
+  const r0=HIST.runs[keys[0][0]], e0=r0.bars[keys[0][1]], num=e0.n||r0.num, den=e0.d||r0.den, bars=[]; let skip=0;
+  keys.forEach(([ri,i])=>{ const run=HIST.runs[ri], e=run.bars[i]; if((e.n||run.num)===num&&(e.d||run.den)===den) bars.push(histBar(e)); else skip++; });
+  if(num!==S.num||den!==S.den){ S.num=num; S.den=den; meterSync(); }
+  HIST.sel.clear(); closePop();
+  rhythm={bars,num,den,pinned:true}; clearPreview(); render(); save(); updateQuick();
+  toast(skip?`נטענו ${bars.length} תיבות (${skip} במשקל אחר דולגו)`:`נטענו ${bars.length===1?'תיבה אחת':bars.length+' תיבות'} · חוזרות עד "מקצב חדש"`);
+};
+
+/* ---------- filming setup screen (opened by 🎬) ---------- */
+const FS_LAY={half:'חצי מסך',bubble:'בועה',corner:'פינה',none:'בלי מצלמה'};
+const FS_MODE={lvl:'עולה ברמה',bpm:'עולה בטמפו',one:'סבב אחד'};
+let FS_STREAM=null;
+async function fsCam(){
+  fsCamStop();
+  if(!S.fmCam||S.fmLay==='none'){ fsDraw(); return; }
+  try{ FS_STREAM=await navigator.mediaDevices.getUserMedia({video:{facingMode:S.fmFacing||'user',width:{ideal:720},height:{ideal:960}},audio:false}); $('fsVid').srcObject=FS_STREAM; try{ await $('fsVid').play(); }catch(e){} }catch(e){ FS_STREAM=null; }
+  fsDraw();
+}
+function fsCamStop(){ if(FS_STREAM){ FS_STREAM.getTracks().forEach(t=>t.stop()); FS_STREAM=null; } $('fsVid').srcObject=null; }
+function fsTiles(){
+  const one=S.fmMode==='one';
+  const T=(k,lbl,ic,val,cls,dis)=>`<button class="fs-tile ${cls||''}" data-fs="${k}" ${dis?'disabled':''}><small>${lbl}</small><span class="ic">${ic}</span><b class="${/^[\d+→\s−-]+$/.test(String(val))?'n':''}">${val}</b></button>`;
+  const step=S.fmMode==='bpm'?'+'+(S.fmStep||10)+' BPM':S.fmMode==='lvl'?`${S.level}→10`:'—';
+  $('fsTiles').innerHTML=
+    T('mode','מבנה','📈',FS_MODE[S.fmMode])+T('rounds','סבבים','🔁',one?'—':S.fmRounds,'',one)+T('step',S.fmMode==='bpm'?'קפיצה':'רמות','↗',step,'o',one||S.fmMode==='lvl')+
+    T('lay','פריסה','▦',FS_LAY[S.fmLay||'half'])+T('count','ספירה','🥁',S.fmCount?'פועלת':'כבויה',S.fmCount?'':'off')+T('text','טקסט','Aa','ערוך')+
+    T('cam','מצלמה','🎥',!S.fmCam?'כבויה':S.fmFacing==='environment'?'אחורית':'קדמית',S.fmCam?'':'off')+T('mic','מיקרופון','🎤',S.fmMic?'פועל':'כבוי',S.fmMic?'':'off')+T('bars','תיבות','▮▮▮▮',S.fmBars||4);
+}
+function fsDraw(){
+  const lay=S.fmCam?(S.fmLay||'half'):'none', p=$('fsPrev');
+  p.className='fs-prev '+lay+(FS_STREAM?'':' nocam');
+  $('fsHandle').textContent=S.fmHandle||''; $('fsHandle').hidden=!S.fmHandle;
+  $('fsTitle').textContent=(S.fmTitle||'').replace(/\{BPM\}/gi,S.bpm); $('fsTitle').hidden=!S.fmTitle;
+  const n=S.fmMode==='one'?1:S.fmRounds; $('fsLvl').textContent=`רמה ${S.level}`+(n>1?` · סבב 1/${n}`:'')+(S.fmMode==='bpm'?` · ${S.bpm} BPM`:'');
+  $('fsLayT').textContent='▦ '+FS_LAY[lay];
+  const h=S.hpLag; $('fsSyncV').textContent=h==null?'':`${Math.round(h*1000)}ms ✓`; $('fsSyncA').textContent=h==null?'סנכרן':'סנכרן מחדש';
+  fsTiles();
+}
+function fsOpen(){ if(!RCS.unlocked) return; if(RC.remoteMode){ toast('מצב צילום עובד רק על המכשיר שמנגן'); return; } if(playing) stop(); $('fSet').hidden=false; fsDraw(); fsCam(); }
+function fsClose(){ $('fSet').hidden=true; $('fsPop').hidden=true; fsCamStop(); }
+function fsPop(title,html,wire){ $('fsPopT').textContent=title; $('fsPopB').innerHTML=html; $('fsPop').hidden=false; wire&&wire($('fsPopB')); }
+const fsOpts=(opts,cur)=>`<div class="fs-opts">${opts.map(([v,t])=>`<button data-v="${v}" class="${v===cur?'on':''}">${t}</button>`).join('')}</div>`;
+function fsChoose(title,opts,cur,set){ fsPop(title,fsOpts(opts,cur),b=>b.querySelectorAll('[data-v]').forEach(x=>x.onclick=()=>{ set(x.dataset.v); save(); $('fsPop').hidden=true; fsDraw(); })); }
+function fsStep(title,get,set,min,max,d,fmt){ const draw=b=>{ b.innerHTML=`<div class="fs-step"><button data-d="-1">−</button><b>${fmt?fmt(get()):get()}</b><button data-d="1">+</button></div>`; b.querySelectorAll('[data-d]').forEach(x=>x.onclick=()=>{ set(clamp(get()+ +x.dataset.d*d,min,max)); save(); draw(b); fsDraw(); }); }; fsPop(title,'',draw); }
+$('fsTiles').addEventListener('click',e=>{ const t=e.target.closest('[data-fs]'); if(!t||t.disabled) return; const k=t.dataset.fs;
+  if(k==='mode') fsChoose('מבנה הסרטון',Object.entries(FS_MODE),S.fmMode,v=>S.fmMode=v);
+  if(k==='rounds') fsStep('סבבים',()=>S.fmRounds,v=>S.fmRounds=v,2,20,1);
+  if(k==='step') fsStep('קפיצת טמפו בכל סבב',()=>S.fmStep||10,v=>S.fmStep=v,1,50,5,v=>'+'+v);
+  if(k==='lay'){ fsChoose('פריסה',Object.entries(FS_LAY),S.fmLay||'half',v=>{ S.fmLay=v; if(v!=='none'&&!S.fmCam){ S.fmCam=true; } }); setTimeout(fsCam,0); }
+  if(k==='count'){ S.fmCount=!S.fmCount; save(); fsDraw(); }
+  if(k==='mic'){ S.fmMic=!S.fmMic; save(); fsDraw(); }
+  if(k==='cam'){ fsChoose('מצלמה',[['user','קדמית'],['environment','אחורית'],['off','כבויה']],S.fmCam?(S.fmFacing||'user'):'off',v=>{ if(v==='off') S.fmCam=false; else { S.fmCam=true; S.fmFacing=v; } }); setTimeout(fsCam,0); }
+  if(k==='bars') fsStep('תיבות בצילום',()=>S.fmBars||4,v=>S.fmBars=v,1,8,1);
+  if(k==='text') fsPop('טקסט בסרטון',`<small>כותרת ({BPM} מתחלף בטמפו)</small><input class="txt" id="fsT1" maxlength="70"><small>שם משתמש</small><input class="txt" id="fsT2" maxlength="40" dir="ltr"><small>טקסט סיום</small><input class="txt" id="fsT3" maxlength="70"><button class="fs-go" id="fsTOk">סיום</button>`,b=>{
+    [['fsT1','fmTitle'],['fsT2','fmHandle'],['fsT3','fmEnd']].forEach(([id,k])=>{ const el=$(id); el.value=S[k]||''; el.oninput=()=>{ S[k]=el.value; save(); fsDraw(); }; }); $('fsTOk').onclick=()=>{ $('fsPop').hidden=true; }; });
+});
+$('fsPopX').onclick=()=>{ $('fsPop').hidden=true; };
+$('fsPop').addEventListener('click',e=>{ if(e.target.id==='fsPop') $('fsPop').hidden=true; });
+$('fsX').onclick=fsClose;
+$('fsSync').onclick=()=>syOpen(false);
+$('fsGo').onclick=()=>{ if(S.fmMic&&S.hpLag==null){ syOpen(true); return; } fsClose(); filmOpen(); };
+
+/* ---------- headphone sync: 8 clicks at 60 BPM in eighths, hit along; the mic tells how late the sound reaches the ears ---------- */
+let SY=null;
+function syOpen(thenFilm){ fsCamStop(); $('fSyncScr').hidden=false; $('syIntro').hidden=false; $('syRun').hidden=true; $('syRes').hidden=true; SY={thenFilm}; }
+function syClose(){ if(SY&&SY.cleanup) SY.cleanup(); SY=null; $('fSyncScr').hidden=true; if(!$('fSet').hidden) fsCam(); }
+async function syGo(){
+  await initAudio(); if(typeof applyVol==='function') applyVol();
+  let mic; try{ mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}); }catch(e){ toast('צריך גישה למיקרופון כדי לסנכרן'); return; }
+  $('syIntro').hidden=true; $('syRes').hidden=true; $('syRun').hidden=false;
+  $('syDots').innerHTML='<i></i>'.repeat(8);
+  // left = what the app plays, right = the microphone, captured sample by sample on the same clock
+  const merge=ctx.createChannelMerger(2), src=ctx.createMediaStreamSource(mic), sp=ctx.createScriptProcessor(2048,2,2), mute=ctx.createGain(); mute.gain.value=0;
+  master.connect(merge,0,0); src.connect(merge,0,1); merge.connect(sp); sp.connect(mute); mute.connect(ctx.destination);
+  const L=[], R=[]; let t0=null;
+  sp.onaudioprocess=e=>{ if(t0==null) t0=e.playbackTime; L.push(new Float32Array(e.inputBuffer.getChannelData(0))); R.push(new Float32Array(e.inputBuffer.getChannelData(1))); };
+  SY.cleanup=()=>{ try{ master.disconnect(merge); }catch(e){} try{ src.disconnect(); sp.disconnect(); mute.disconnect(); }catch(e){} mic.getTracks().forEach(t=>t.stop()); };
+  const start=ctx.currentTime+0.6, gap=0.5, clicks=[];
+  for(let i=0;i<8;i++){ const t=start+i*gap; clicks.push(t); click(t,i===0?'acc':'beat');
+    setTimeout(()=>{ if(!SY) return; const p=$('syPulse'); p.textContent=8-i; p.classList.add('beat'); setTimeout(()=>p.classList.remove('beat'),90); const d=$('syDots').children[i]; if(d) d.classList.add('on'); },Math.max(0,(t-ctx.currentTime)*1000)); }
+  setTimeout(()=>{ if(!SY) return; const cl=SY.cleanup; SY.cleanup=null; cl(); syAnalyze(L,R,t0,clicks); },(start-ctx.currentTime+8*gap+0.4)*1000);
+}
+function syAnalyze(Lc,Rc,t0,clicks){
+  const sr=ctx.sampleRate, cat=a=>{ const n=a.reduce((s,x)=>s+x.length,0), o=new Float32Array(n); let p=0; a.forEach(x=>{ o.set(x,p); p+=x.length; }); return o; };
+  const L=cat(Lc), R=cat(Rc), ms=Math.floor(sr/1000);
+  const env=x=>{ const n=Math.floor(x.length/ms), e=new Float32Array(n); for(let i=0;i<n;i++){ let m=0; for(let k=i*ms;k<(i+1)*ms;k++){ const v=Math.abs(x[k]); if(v>m) m=v; } e[i]=m; } return e; };
+  const eL=env(L), eR=env(R);
+  // where each click really sits in the captured audio (left), and the first hit after it in the mic (right)
+  const onset=(e,from,to,th)=>{ for(let i=Math.max(4,from);i<Math.min(e.length,to);i++) if(e[i]-e[i-4]>th) return i; return -1; };
+  const mxL=Math.max(...eL), mxR=Math.max(...eR), offs=[], rows=[];
+  clicks.forEach(c=>{ const ci=Math.round((c-t0)*1000), l=onset(eL,ci-60,ci+300,mxL*0.3); // the capture runs a little behind the clock if(l<0) return;
+    const h=onset(eR,l-60,l+420,mxR*0.25); if(h<0) return; offs.push((h-l)/1000); rows.push((h-l)/1000); });
+  const o=offs.slice().sort((a,b)=>a-b);
+  $('syRun').hidden=true; $('syRes').hidden=false;
+  const bad=(msg)=>{ $('syIcon').textContent='!'; $('syIcon').classList.add('bad'); $('syHead').textContent='המדידה לא הצליחה'; $('syNum').textContent=''; $('syMsg').textContent=msg; $('syHits').innerHTML=''; $('syStat').textContent=''; $('syGo').textContent=SY&&SY.thenFilm?'המשך בלי סנכרון ›':'סגור'; };
+  $('syIcon').classList.remove('bad'); $('syIcon').textContent='✓';
+  if(o.length<5) return bad(`נקלטו רק ${o.length} מכות מתוך 8. הכה חזק יותר, קרוב לטלפון`);
+  const med=o[Math.floor(o.length/2)], spread=o[o.length-2]-o[1];
+  if(spread>0.09) return bad('המכות היו מפוזרות מדי. נסה שוב, בדיוק עם הקליק');
+  if(med>0.35) return bad('יצא איחור גדול מדי. כנראה רעש ברקע. נסה שוב במקום שקט');
+  S.hpLag=S.hpMeas=+Math.max(0,med).toFixed(3); save();
+  $('syHead').textContent=med<0.03?'בלי איחור מורגש':'האוזניות מאחרות ב־'; $('syNum').textContent=Math.round(med*1000)+'ms';
+  $('syMsg').innerHTML='מעכשיו הצליל בסרטון יוזז בהתאם.<br>נשמר גם לפעמים הבאות.';
+  $('syHits').innerHTML='<div class="sy-mut sm" style="text-align:right">⬜ קליק  🟧 המכה שלך</div>'+rows.slice(0,4).map((d,i)=>`<div class="sy-row"><span>${i+1}</span><div class="ln"><i class="k" style="left:20%"></i><i class="h" style="left:${20+Math.min(75,d*1000/4)}%"></i></div></div>`).join('');
+  $('syStat').textContent=`${o.length} מתוך 8 מכות נקלטו · יציב`; $('syGo').textContent=SY&&SY.thenFilm?'המשך לצילום ›':'סיום';
+}
+$('syStart').onclick=syGo; $('syAgain').onclick=()=>{ $('syRes').hidden=true; syGo(); };
+$('syX').onclick=syClose;
+$('syGo').onclick=()=>{ const go=SY&&SY.thenFilm; syClose(); if(go){ fsClose(); filmOpen(); } else fsDraw(); };
+
+
+// filming settings moved to the 🎬 screen; the secret panel keeps only the remote control
+$('remBox').hidden=false;

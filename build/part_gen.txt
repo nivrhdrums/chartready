@@ -1,0 +1,60 @@
+/* ---------- rhythm generation ---------- */
+const density=()=>0.15+(S.level-1)*0.8/9;
+function groupsFor(num,den){
+  if(den===4) return Array(num).fill(1);
+  if(num%3===0) return Array(num/3).fill(3);
+  if(num===1) return [1];
+  if(num%2===0) return Array(num/2).fill(2);
+  return Array((num-3)/2).fill(2).concat(3);
+}
+function genGroup(k,den){
+  const d=density();
+  if(den===4){
+    let gs=[1,2,4,3,6].filter(g=>S.grids[g]); if(!gs.length) gs=S.grids.L?[3]:[2];
+    for(let tries=0;;tries++){
+      const g=gs[Math.floor(Math.random()*gs.length)], p=g===1?0.3+d*0.65:d;
+      const bt={t:'q',k:1,g,slots:Array.from({length:g},()=>Math.random()<p)};
+      if(!EXCL.has(beatCode(bt))) return bt;
+      if(tries>40){ const al=allowed('q'+g,()=>Array.from({length:1<<g},(_,m)=>({t:'q',k:1,g,slots:[...Array(g)].map((_,i)=>!!((m>>(g-1-i))&1))})));
+        if(al.length){ const c=al[Math.floor(Math.random()*al.length)]; return {t:'q',k:1,g,slots:c.slots.slice()}; } }
+    }
+  }
+  const opts=[]; if(S.grids[1]||S.grids[2]||S.grids[3]||S.grids.L) opts.push(k); if(S.grids[4]||S.grids[6]) opts.push(k*2); if(!opts.length) opts.push(k);
+  const g=opts[Math.floor(Math.random()*opts.length)];
+  return {t:'e',k,g,slots:Array.from({length:g},()=>Math.random()<d)};
+}
+// quarter-note triplet (2 beats) or half-note triplet (whole 4 beats): 3 cells, each a long note, two short ones, or a rest
+function longCells(k){ return allowed('L'+k,()=>{ const out=[]; ['10','11','00'].forEach(a=>['10','11','00'].forEach(b=>['10','11','00'].forEach(c=>{ const x=a+b+c; if(x!=='000000') out.push({t:'L',k,g:6,slots:[...x].map(ch=>ch==='1')}); }))); return out; }); }
+function genLong(k){
+  const d=density();
+  if(!longCells(k).length) return null;
+  for(let tries=0;;tries++){
+    if(tries>40){ const al=longCells(k); const c=al[Math.floor(Math.random()*al.length)]; return {t:'L',k,g:6,slots:c.slots.slice()}; }
+    const slots=[];
+    for(let c=0;c<3;c++){ const r=Math.random(); if(r<0.1){slots.push(false,false);} else if(r<0.1+d*0.6){slots.push(true,true);} else slots.push(true,false); }
+    const bt={t:'L',k,g:6,slots};
+    if(slots.some(Boolean)&&!EXCL.has(beatCode(bt))) return bt;
+  }
+}
+function genRhythm(){
+  const groups=groupsFor(S.num,S.den), bars=[];
+  const only=![1,2,4,3,6].some(g=>S.grids[g]);
+  for(let b=0;b<S.bars;b++){
+    let gr=[];
+    if(S.den===4&&S.grids.L){
+      let i=0;
+      while(i<S.num){
+        const r=Math.random();
+        const h=longCells(4).length, qq=longCells(2).length;
+        if(h&&i%2===0&&i+4<=S.num&&r<(only?(qq?0.35:1):0.12)){ gr.push(genLong(4)); i+=4; continue; }
+        if(qq&&i%2===0&&i+2<=S.num&&r<(only?1:0.35)){ gr.push(genLong(2)); i+=2; continue; }
+        gr.push(genGroup(1,4)); i++;
+      }
+    } else gr=groups.map(k=>genGroup(k,S.den));
+    if(!gr.some(x=>x.slots.some(Boolean))) gr[Math.floor(Math.random()*gr.length)].slots[0]=true;
+    gr.seed=1+Math.floor(Math.random()*2e9);
+    bars.push(gr);
+  }
+  return {bars,num:S.num,den:S.den};
+}
+

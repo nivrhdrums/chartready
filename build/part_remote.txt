@@ -1,0 +1,181 @@
+/* ---------- volume + sound card ---------- */
+S.sinkId=''; // sound always goes to the computer's default output
+
+/* ---------- remote control: one computer plays, one phone controls ---------- */
+let RCS={unlocked:SECRET_OPEN,role:null,token:null};
+try{ RCS=Object.assign(RCS,JSON.parse(localStorage.getItem('cr_remote')||'{}')); }catch(e){}
+if(SECRET_OPEN) RCS.unlocked=true;
+const rcSave=()=>{ try{ localStorage.setItem('cr_remote',JSON.stringify(RCS)); }catch(e){} };
+let rcWs=null, rcPass=null, rcPending=null, rcRetry=0, rcTimer=null, rcStopped=false, rcLocal=null;
+async function sha(t){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+const rsend=d=>{ if(rcWs&&rcWs.readyState===1) rcWs.send(JSON.stringify({t:'msg',d})); };
+function rcStatus(txt){ $('remStatus').textContent=txt; }
+function rcUI(){
+  const on=RC.peer, role=RCS.role;
+  $('remInd').hidden=!(RCS.unlocked&&role);
+  $('remInd').classList.toggle('on',!!on);
+  $('remIndT').textContent=role==='remote'?'מחשב':'טלפון';
+  $('remLock').textContent=RCS.unlocked?'סודי 🔓':'סודי 🔒';
+  // filming mode lives behind the same password
+  $('fmSec').hidden=!RCS.unlocked;
+  $('remHost').hidden=role==='remote'; $('remPhone').hidden=role!=='remote';
+  $('remUnpair').hidden=!(role==='host'&&RC.paired);
+  $('remPair').textContent=role==='host'&&RC.paired?'חבר טלפון אחר':'חבר את הטלפון';
+  $('remDot').classList.toggle('on',!!on);
+  if(!RCS.unlocked) return;
+  if(role==='host') rcStatus(RC.connected?(on?`מחובר לטלפון${RC.phoneName?' · '+RC.phoneName:''}`:(RC.paired?'הטלפון לא מחובר כרגע':'עוד לא שויך טלפון')):'מתחבר לשרת…');
+  else if(role==='remote') rcStatus(RC.connected?(on?'מחובר למחשב. הטלפון שולט, והצליל יוצא מהמחשב.':'המחשב לא מחובר כרגע'):'מתחבר לשרת…');
+  else rcStatus('המכשיר הזה עוד לא מחובר.');
+  $('outPhoneHint').hidden=!RC.remoteMode;
+}
+function rcConnect(){
+  clearTimeout(rcTimer); if(rcStopped) return;
+  let ws;
+  try{ ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'); }catch(e){ rcStatus('השליטה מרחוק עובדת רק בגרסה שמותקנת על השרת שלך.'); return; }
+  rcWs=ws;
+  ws.onopen=()=>{ rcRetry=0;
+    if(rcPending&&rcPending.auto){ ws.send(JSON.stringify({t:'remoteAuto',name:/iPhone/.test(navigator.userAgent)?'iPhone':/Android/.test(navigator.userAgent)?'Android':'טלפון'})); return; }
+    if(rcPending&&rcPending.join){ ws.send(JSON.stringify({t:'pairJoin',code:rcPending.join,name:/iPhone/.test(navigator.userAgent)?'iPhone':/Android/.test(navigator.userAgent)?'Android':'טלפון'})); return; }
+    if(RCS.role==='host') ws.send(JSON.stringify({t:'host',token:RCS.token,pass:rcPass||''}));
+    else if(RCS.role==='remote'&&RCS.token) ws.send(JSON.stringify({t:'remote',token:RCS.token}));
+  };
+  ws.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(x){ return; } rcHandle(m); };
+  ws.onclose=()=>{ if(rcWs!==ws) return; RC.connected=false; RC.peer=false; rcMode(false); rcUI();
+    if(RCS.role&&(RCS.token||rcPending)&&!rcStopped){ rcRetry=Math.min(rcRetry+1,6); rcTimer=setTimeout(rcConnect,1000*rcRetry); } };
+  ws.onerror=()=>{ if(location.hostname.endsWith('claude.ai')||location.protocol==='file:') rcStatus('השליטה מרחוק עובדת רק בגרסה שמותקנת על השרת שלך.'); };
+}
+function rcHandle(m){
+  if(m.t==='hostOk'){ RCS.role='host'; RCS.token=m.token; rcPass=null; rcSave(); RC.connected=true; if((rcPending&&rcPending.pair)||(!rcLocal&&!$('remPairBox').hidden)){ rcPending=null; rcWs.send(JSON.stringify({t:'pairStart'})); } rcUI(); return; } // after a server restart the old code is gone: show a fresh one
+  if(m.t==='pairCode'){ showPair(m.code); return; }
+  if(m.t==='paired'){ RCS.role='remote'; RCS.token=m.token; RCS.unlocked=true; rcPending=null; rcSave(); RC.connected=true; toast('הטלפון חובר למחשב'); rcUI(); return; }
+  if(m.t==='peer'){ RC.connected=true; RC.peer=m.online; if(m.phoneName!=null) RC.phoneName=m.phoneName; if(m.paired!=null) RC.paired=m.paired;
+    if(RCS.role==='host'){ if(m.online){ $('remPairBox').hidden=true; hostSendState(true); hostSendLive(true); } }
+    else rcMode(m.online);
+    rcUI(); return; }
+  if(m.t==='revoked'&&rcLocal&&RCS.role==='remote'&&m.why!=='other'){ RCS.role=null; RCS.token=null; rcSave(); rcPending={auto:true}; setTimeout(rcConnect,500); return; }
+  if(m.t==='err'&&m.code==='nohost'){ rcStatus('המחשב עוד לא פתח את האפליקציה. מנסה שוב…'); clearTimeout(rcTimer); rcTimer=setTimeout(()=>{ rcPending={auto:true}; rcConnect(); },3000); return; }
+  if(m.t==='revoked'){ if(RCS.role==='remote'){ RCS.role=null; RCS.token=null; toast('השיוך למחשב בוטל'); } else { RC.paired=false; } rcSave(); rcMode(false); RC.peer=false; rcUI(); return; }
+  if(m.t==='replaced'){ rcStopped=true; rcStatus('החיבור עבר לחלון אחר של האפליקציה.'); return; }
+  if(m.t==='err'){ rcPending=null; const t={password:'הסיסמה לא נכונה',locked:'יותר מדי ניסיונות. נסה שוב בעוד 10 דקות.',badcode:'הקוד לא נכון או שפג תוקפו'}[m.code]||'שגיאה'; toast(t); rcStatus(t); if(m.code==='password'&&RCS.role==='host'&&!RCS.token){ RCS.role=null; rcSave(); } return; }
+  if(m.t==='msg') rcMsg(m.d);
+}
+async function showPair(code){
+  // on the computer's own server (localhost) the phone needs the computer's address on the home WiFi
+  let base=location.origin;
+  if(/^(localhost|127\.|\[::1\])/.test(location.hostname)){ try{ const j=await (await fetch('/lan')).json(); if(j.url) base=j.url; }catch(e){} }
+  const url=`${base}${location.pathname}?pair=${code}`;
+  $('remPairBox').hidden=false; $('remCode').textContent=code.replace(/(\d{3})(\d{3})/,'$1 $2'); $('remUrl').textContent=url;
+  try{ const q=qrcode(0,'M'); q.addData(url); q.make(); $('remQR').innerHTML=q.createSvgTag({cellSize:5,margin:2,scalable:true}); }catch(e){ $('remQR').textContent=''; }
+}
+/* phone side: mirror the computer, send every change back */
+function rcMode(on){
+  if(RCS.role!=='remote') { RC.remoteMode=false; return; }
+  if(RC.remoteMode===on) return;
+  RC.remoteMode=on; if(!on){ RC.live=null; setPlayingUI(false); }
+  $('screen').classList.toggle('remote',on);
+}
+let rcSendT=null;
+onSave=()=>{
+  if(RC.applying) return;
+  if(RC.remoteMode){ clearTimeout(rcSendT); rcSendT=setTimeout(()=>rsend({k:'S',S}),70); }
+  else if(RCS.role==='host'&&RC.peer) hostDirty();
+};
+function deser(st){ const bars=st.bars.map(b=>{ const a=b.g; a.seed=b.s; return a; }); return {bars,num:st.num,den:st.den}; }
+function rcMsg(d){
+  if(RCS.role==='remote'){
+    if(d.k==='state'){ RC.applying=true; const tabCh=d.S.tab!==S.tab; Object.assign(S,d.S); if(tabCh) setTab(S.tab); syncUI(); rhythm=deser(d); render(); RC.applying=false; if(RC.live) applyLive(RC.live); }
+    if(d.k==='live') applyLive(d);
+    if(d.k==='note') toast(d.txt,{ms:5000});
+    return;
+  }
+  if(RCS.role==='host'){
+    if(d.k==='S') applyPhoneS(d.S);
+    if(d.k==='cmd'){ if(d.c==='toggle'&&!audOk()){ audGate(true); rsend({k:'note',txt:'צריך ללחוץ פעם אחת על מסך המחשב כדי לאפשר צליל, ואז ללחוץ נגן שוב'}); return; } if(d.c==='toggle') toggle(); if(d.c==='new') requestNew(); if(d.c==='clock'){ if(d.a==='go') clk.on?clockStop():clockStart(); if(d.a==='reset'){ clk.acc=0; if(clk.on) clk.from=performance.now(); clockTick(); } } hostSendLive(true); }
+  }
+}
+function applyPhoneS(ns){
+  RC.applying=true; const old=JSON.parse(JSON.stringify(S)); Object.assign(S,ns);
+  if(old.tab!==S.tab) setTab(S.tab);
+  if(old.timerSec!==S.timerSec||old.clockMode!==S.clockMode){ clockStop(); clk.acc=0; }
+  syncUI();
+  const ch=k=>JSON.stringify(old[k])!==JSON.stringify(S[k]);
+  if(['grids','level','num','den','bars'].some(ch)) requestNew(); else if(['restLvl','ties','showCount','sextCount'].some(ch)&&rhythm) render();
+  RC.applying=false; save(); hostSendState(true);
+}
+/* computer side: send the screen to the phone */
+let hostT=null, lastLive='';
+function hostDirty(){ clearTimeout(hostT); hostT=setTimeout(()=>hostSendState(true),80); }
+function hostSendState(){
+  if(RCS.role!=='host'||!RC.peer) return;
+  const r=rhythm||{num:S.num,den:S.den,bars:[]}, bars=(shown&&shown.length?shown:r.bars);
+  rsend({k:'state',S,bars:bars.map(b=>({s:b.seed,g:b})),num:r.num,den:r.den});
+}
+let trLast=null;
+function hostSendLive(force){
+  if(RCS.role!=='host'||!RC.peer) return;
+  const cur=document.querySelector('.barbox.cur'), col=[...document.querySelectorAll('#cols .col')].findIndex(c=>c.classList.contains('on'));
+  const L={k:'live',playing,tab:S.tab,cur:cur?cur.id:null,col,ghost:$('cols').classList.contains('ghost'),
+    badge:{h:$('gapBadge').hidden,t:$('gapBadge').textContent,m:$('gapBadge').classList.contains('mute')},
+    liveMain:$('liveMain').textContent,liveSub:$('liveSub').textContent,trMain:$('trMain').textContent,trSub:$('trSub').textContent,trSum:$('trSum').textContent,trInfo:$('trInfo').hidden,
+    tr:playing&&S.tab==='tr'?trLast:null,clock:{on:clk.on,t:Math.floor(clkNow())}};
+  const j=JSON.stringify(L); if(!force&&j===lastLive) return; lastLive=j; rsend(L);
+}
+setInterval(()=>hostSendLive(false),120);
+function applyLive(L){
+  RC.live=L;
+  setPlayingUI(L.playing);
+  document.querySelectorAll('.barbox').forEach(el=>el.classList.toggle('cur',el.id===L.cur));
+  document.querySelectorAll('#cols .col').forEach((el,i)=>el.classList.toggle('on',i===L.col));
+  $('cols').classList.toggle('ghost',L.ghost);
+  $('gapBadge').hidden=L.badge.h; $('gapBadge').textContent=L.badge.t; $('gapBadge').classList.toggle('mute',L.badge.m);
+  $('live').hidden=!(L.playing&&S.tab==='gen'); $('liveMain').textContent=L.liveMain; $('liveSub').textContent=L.liveSub;
+  if(S.tab==='tr'){ $('trMain').textContent=L.trMain; $('trSub').textContent=L.trSub; $('trSum').textContent=L.trSum; $('trInfo').hidden=L.trInfo; if(L.tr) drawTrainer(L.tr); else if(!L.playing) drawTrainer(null); }
+  clk.on=false; clk.acc=L.clock.t; clockTick(); ['clockPill','clockPillG'].forEach(id=>{ $(id).classList.toggle('run',L.clock.on); $(id).classList.toggle('dim',!L.clock.on&&!L.clock.t); }); $('clockGo').textContent=L.clock.on?'עצור':(L.clock.t?'המשך':'הפעל');
+}
+// bring every control in line with S (used when the other device changed something)
+function syncUI(){
+  setBpm(S.bpm); syncGrids(); meterSync(); barsSync(); mbSync();
+  ['repeats','mSub','sextCount','trMode','clockMode','clickSnd'].forEach(id=>{ const el=$(id); el&&el._sync&&el._sync(); });
+  $('level').value=S.level; $('levelOut').textContent=S.level; restSync(); sndDraw(); gapUI(); trSetUI(); dynMaxUI();
+  ['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]);
+  ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>$(k).value=S[k]);
+  secSync(); buildCols(); renderSongs(); renderTrPresets(); renderGenPresets(); updateQuick(); clockTick(); applyVol();
+}
+/* settings panel */
+$('remLock').onclick=()=>{ if(RCS.unlocked){ $('remPanel').hidden=!$('remPanel').hidden; rcUI(); return; } secretAsk(); };
+$('remPair').onclick=()=>{
+  rcStopped=false; RCS.role='host'; rcSave();
+  if(RC.connected&&RCS.token){ rcWs.send(JSON.stringify({t:'pairStart'})); return; }
+  rcPending={pair:true}; rcConnect();
+};
+$('remUnpair').onclick=()=>{ if(rcWs&&rcWs.readyState===1) rcWs.send(JSON.stringify({t:'unpair'})); RC.paired=false; rcUI(); toast('השיוך בוטל'); };
+$('remPhoneUnpair').onclick=()=>{ if(rcWs&&rcWs.readyState===1) rcWs.send(JSON.stringify({t:'unpair'})); RCS.role=null; RCS.token=null; rcSave(); rcStopped=true; try{rcWs.close();}catch(e){} rcMode(false); RC.peer=false; rcUI(); };
+$('remEnterCode').onclick=()=>openKeypad({title:'קוד חיבור מהמחשב',value:'',min:0,max:999999,secret:false,maxLen:6,raw:true,onOk:v=>{ rcStopped=false; rcPending={join:String(v).padStart(6,'0')}; rcConnect(); }});
+$('remLockAgain').onclick=()=>{ $('remPanel').hidden=true; };
+// personal version on the home WiFi: the computer is always the host and shows a QR of its own address;
+// a phone that opens that address becomes the remote by itself, no code needed
+async function rcLocalInit(){
+  let j=null; try{ j=await (await fetch('/lan',{cache:'no-store'})).json(); }catch(e){ return false; } if(!j||!j.local) return false; rcLocal=j;
+  const loop=/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  $('remEnterCode').hidden=true; $('remPair').hidden=true;
+  if(loop){
+    RCS.role='host'; rcSave(); rcStopped=false; rcConnect();
+    const url=(j.url||location.origin)+'/';
+    $('remPairBox').hidden=false; $('remCode').hidden=true; $('remUrl').textContent=url;
+    const h=$('remPairBox').querySelector('.hint'); if(h) h.textContent='הטלפון צריך להיות על אותו WiFi. אפשר לשמור את הכתובת למסך הבית.';
+    try{ const q=qrcode(0,'M'); q.addData(url); q.make(); $('remQR').innerHTML=q.createSvgTag({cellSize:5,margin:2,scalable:true}); }catch(e){}
+  } else {
+    if(!(RCS.role==='remote'&&RCS.token)) rcPending={auto:true};
+    rcStopped=false; rcConnect();
+  }
+  rcUI(); return true;
+}
+// a QR link opens the app straight into pairing
+(async function(){ if(await rcLocalInit()) return; const p=new URLSearchParams(location.search).get('pair'); if(p&&/^\d{6}$/.test(p)){ rcPending={join:p}; history.replaceState(null,'',location.pathname); rcConnect(); } else if(RCS.role&&RCS.token) rcConnect(); })();
+rcUI();
+
+/* the computer's browser blocks sound until someone clicks the page once; the phone can't do that click */
+function audOk(){ return !!(typeof ctx!=='undefined'&&ctx&&ctx.state==='running'); }
+function audGate(show){ const g=$('audGate'); if(g) g.hidden=!show||audOk(); }
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{ if(RCS.role==='host'&&!audOk()) initAudio().then(()=>audGate(false)).catch(()=>{}); },true));
+setInterval(()=>{ if(RCS.role==='host') audGate(!audOk()); else audGate(false); },1500);

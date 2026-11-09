@@ -1,0 +1,143 @@
+/* ---------- wheels: a sideways scroller that always centres the chosen value ---------- */
+function wheel(el,vals,onPick,fmtv){
+  el.innerHTML=`<div class="wtrack">${vals.map(v=>`<button data-v="${v}">${fmtv?fmtv(v):v}</button>`).join('')}</div>`;
+  const tr=el.firstChild; let cur=null, st=null, raf=0;
+  const W={el,vals,
+    set(v,anim){ cur=v; tr.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===+v)); W.center(anim); },
+    center(anim){ const b=tr.querySelector(`[data-v="${cur}"]`); if(!b||!el.clientWidth) return; const x=b.offsetLeft+b.offsetWidth/2-el.clientWidth/2; el.scrollTo({left:x,behavior:anim?'smooth':'auto'}); }};
+  // after a fling, the value nearest the middle wins
+  el.addEventListener('scroll',()=>{ clearTimeout(st); st=setTimeout(()=>{ const mid=el.scrollLeft+el.clientWidth/2; let best=null, bd=1e9;
+    tr.querySelectorAll('button').forEach(b=>{ const d=Math.abs(b.offsetLeft+b.offsetWidth/2-mid); if(d<bd){ bd=d; best=b; } });
+    if(best&&+best.dataset.v!==+cur){ cur=+best.dataset.v; W.set(cur,true); onPick(cur); uiTick(); } else if(best&&bd>2) W.center(true); },110); },{passive:true});
+  tr.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; cur=+b.dataset.v; W.set(cur,true); onPick(cur); uiTick(); };
+  return W;
+}
+WH.num=wheel($('wNum'),[...Array(19)].map((_,i)=>i+1),v=>{ S.num=v; $('num').value=v; meterSync(); save(); updateQuick(); regen(); });
+WH.den=wheel($('wDen'),[4,8],v=>{ S.den=v; $('den').value=v; meterSync(); save(); updateQuick(); regen(); });
+WH.bars=wheel($('wBars'),[...Array(16)].map((_,i)=>i+1),v=>{ S.bars=v; barsSync(); save(); updateQuick(); regen(); });
+WH.mb=wheel($('wMB'),[...Array(19)].map((_,i)=>i+1),v=>setMBeats(v));
+function bsqDraw(){ $('bSq').innerHTML=[...Array(S.bars)].map(()=>'<i></i>').join(''); }
+meterSync(); barsSync(); mbSync();
+
+/* ---------- tempo popup: keypad, ±5 and a tap pad ---------- */
+function tpOpen(){ TP.typing=false; TP.val=''; tpMode(false); $('tpShow').textContent=S.bpm; $('tpShow').classList.remove('bad','typing'); $('tpName').textContent=tempoName(S.bpm); }
+function tpPaint(){ const v=+TP.val; $('tpShow').innerHTML=`${TP.val||'&nbsp;'}<span class="cur"></span>`; $('tpShow').classList.add('typing'); $('tpShow').classList.toggle('bad',!!TP.val&&(v<1||v>400)); }
+$('tpKp').onclick=e=>{ const b=e.target.closest('[data-t]'); if(!b) return; const k=b.dataset.t; uiKey();
+  if(k==='ok'){ const v=+TP.val; if(TP.typing&&TP.val){ if(v<1||v>400) return; setBpm(v); } TP.typing=false; closePop(); return; }
+  if(!TP.typing){ TP.typing=true; TP.val=''; }
+  if(k==='del') TP.val=TP.val.slice(0,-1); else if(TP.val.length<3) TP.val=(TP.val==='0'?'':TP.val)+k;
+  tpPaint(); };
+const bump=d=>{ TP.typing=false; setBpm(S.bpm+d); $('tpShow').classList.remove('typing','bad'); $('tpShow').textContent=S.bpm; uiTick(); };
+$('bpmDown').onclick=()=>bump(-5); $('bpmUp').onclick=()=>bump(5); $('tpDn2').onclick=()=>bump(-5); $('tpUp2').onclick=()=>bump(5);
+function tpMode(on){ TP.tapMode=on; $('tpKeys').hidden=on; $('tpTap').hidden=!on; taps=[]; tpDots(); TP.typing=false; $('tpShow').classList.remove('typing','bad'); $('tpShow').textContent=S.bpm; }
+function tpDots(){ $('tpDots').innerHTML=[...Array(8)].map((_,i)=>`<i class="${i<Math.min(taps.length,8)?'on':''}"></i>`).join(''); }
+$('tpTapBtn').onclick=()=>tpMode(true); $('tpKbd').onclick=()=>tpMode(false);
+$('tap').addEventListener('pointerdown',e=>{ e.preventDefault(); tapTempo(); tpDots(); $('tpShow').textContent=S.bpm; ripple($('tap'),e); });
+document.addEventListener('keydown',e=>{ if(!$('pop').classList.contains('open')||popField!==$('fTempo')||kp) return;
+  if(/^[0-9]$/.test(e.key)){ $('tpKp').querySelector(`[data-t="${e.key}"]`).click(); e.preventDefault(); }
+  else if(e.key==='Backspace'){ $('tpKp').querySelector('[data-t="del"]').click(); e.preventDefault(); }
+  else if(e.key==='Enter'){ $('tpKp').querySelector('[data-t="ok"]').click(); e.preventDefault(); } });
+
+/* ---------- mixer: main fader + one per sound, each with its own mute ---------- */
+const MIXC=[['main','ראשי','🎚'],['notes','תווים','🥁'],['acc','דגש','>'],['click','קליק','♩'],['bell','פעמון','🔔']];
+if(!S.mix) S.mix={main:S.vol!=null?S.vol:90,notes:80,acc:100,click:85,bell:70};
+if(!S.mixMute) S.mixMute={main:!!S.mute};
+function mixDraw(){
+  $('mixer').innerHTML=MIXC.map(([k,n,ic],i)=>{ const v=S.mix[k], m=!!S.mixMute[k];
+    return `${i===1?'<span class="msep"></span>':''}<div class="fd${k==='main'?' mst':''}${m?' off':''}" data-k="${k}"><span class="pct">${m?0:v}%</span><div class="ftr"><i style="height:${v}%"></i><b style="bottom:${v}%"></b></div><span class="ic">${ic}</span><span class="nm">${n}</span><button class="mute" data-m="${k}" aria-label="השתק ${n}">${m?'🔇':'🔊'}</button></div>`; }).join(''); }
+function applyVol(){
+  const on=k=>S.mixMute[k]?0:(S.mix[k]/100);
+  if(master) master.gain.value=on('main')*0.9;
+  if(BUS.notes){ BUS.notes.gain.value=on('notes')*1.1; BUS.acc.gain.value=on('acc')*1.1; BUS.click.gain.value=on('click')*1.15; BUS.bell.gain.value=on('bell'); }
+  S.vol=S.mix.main; S.mute=!!S.mixMute.main;
+  $('volBtn').classList.toggle('muted',!!S.mixMute.main||S.mix.main===0);
+}
+(()=>{ const mx=$('mixer'); let d=null;
+  const setFrom=(fd,y)=>{ const tr=fd.querySelector('.ftr').getBoundingClientRect(), v=Math.round(clamp((tr.bottom-y)/tr.height,0,1)*100), k=fd.dataset.k;
+    S.mix[k]=v; if(v>0) S.mixMute[k]=false; fd.querySelector('.ftr i').style.height=v+'%'; fd.querySelector('.ftr b').style.bottom=v+'%'; fd.querySelector('.pct').textContent=v+'%'; fd.classList.remove('off'); fd.querySelector('.mute').textContent='🔊'; applyVol(); };
+  mx.addEventListener('pointerdown',e=>{ if(e.target.closest('.mute')) return; const fd=e.target.closest('.fd'); if(!fd) return; d=fd; mx.setPointerCapture(e.pointerId); setFrom(fd,e.clientY); });
+  mx.addEventListener('pointermove',e=>{ if(d) setFrom(d,e.clientY); });
+  const up=()=>{ if(d){ d=null; save(); } }; mx.addEventListener('pointerup',up); mx.addEventListener('pointercancel',up);
+  mx.addEventListener('click',e=>{ const b=e.target.closest('.mute'); if(!b) return; const k=b.dataset.m; S.mixMute[k]=!S.mixMute[k]; save(); applyVol(); mixDraw(); });
+})();
+applyVol();
+
+/* ---------- click sound cards (metronome tile and settings) ---------- */
+const SNDC=[['pro','מקצועי','הקליק המוקלט'],['wood','בלוק עץ','חם ועגול'],['sticks','מקלות','חד ויבש']];
+function sndDraw(){ ['clickSnd','clickSnd2'].forEach(id=>{ $(id).innerHTML=SNDC.map(([k,n,d])=>`<button class="scard" data-v="${k}" aria-pressed="${S.clickSnd===k}"><span class="si">${SNDI[k]}</span><b>${n}</b><small>${d}</small></button>`).join(''); }); }
+['clickSnd','clickSnd2'].forEach(id=>$(id).onclick=async e=>{ const b=e.target.closest('.scard'); if(!b) return; S.clickSnd=b.dataset.v; save(); sndDraw(); updateQuick();
+  await initAudio(); const t=ctx.currentTime+0.05; click(t,'acc'); click(t+0.3,'beat'); click(t+0.6,'beat'); });
+$('clickSnd')._sync=sndDraw; sndDraw();
+
+/* ---------- gaps: counters and one strip that shows the cycle ---------- */
+function gapUI(){
+  $('gapBody').hidden=!S.gapOn; $('gapPlayV').textContent=S.gapPlay; $('gapMuteV').textContent=S.gapMute; $('gapPlay').value=S.gapPlay; $('gapMute').value=S.gapMute;
+  const n=S.gapPlay+S.gapMute; $('gapCyc').textContent=`סבב של ${n} תיבות`;
+  $('gapStrip').innerHTML=[...Array(n)].map((_,i)=>`<i class="${i<S.gapPlay?'p':'m'}"></i>`).join('');
+  $('gapLeg').innerHTML=`<span><i class="p"></i>${S.gapPlay} עם קליק</span><span><i class="m"></i>${S.gapMute} שקטות</span>`;
+}
+$('fGap').addEventListener('click',e=>{ const b=e.target.closest('[data-gp]'); if(!b) return; const k=b.dataset.gp; S[k]=clamp(S[k]+ +b.dataset.d,1,16); save(); gapUI(); updateQuick(); });
+gapUI();
+function gapStripNow(i){ document.querySelectorAll('#gapStrip i').forEach((el,j)=>el.classList.toggle('now',j===i)); }
+
+/* ---------- press and hold repeats, faster and faster ---------- */
+function holdRepeat(root,sel,fn){
+  let t=null, n=0; const stop=()=>{ clearTimeout(t); t=null; };
+  root.addEventListener('pointerdown',e=>{ const b=e.target.closest(sel); if(!b) return; e.preventDefault(); n=0; fn(b,0); const go=()=>{ n++; fn(b,n); t=setTimeout(go,n<5?220:n<15?90:40); }; t=setTimeout(go,450); });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>root.addEventListener(ev,stop));
+}
+
+/* ---------- time keypad ("microwave"): digits come in from the right, 130 = 1:30 ---------- */
+function openTimeKeypad(o){ openKeypad({title:o.title,time:true,val:'',maxLen:6,onOk:o.onOk,secret:false,raw:true}); }
+
+/* ---------- practice clock: timer value opens the time keypad ---------- */
+$('timerVal').onclick=()=>openTimeKeypad({title:'זמן לטיימר',onOk:sec=>{ S.timerSec=clamp(sec,5,MAXT); clk.acc=0; save(); clockTick(); }});
+$('tPresets').innerHTML=[[60,'1 דק׳'],[300,'5 דק׳'],[600,'10 דק׳'],[900,'15 דק׳'],[1800,'30 דק׳'],[3600,'שעה']].map(([v,t])=>`<button class="chip" data-s="${v}">${t}</button>`).join('');
+$('tPresets').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return; S.timerSec=+b.dataset.s; clk.acc=0; save(); clockTick(); };
+
+/* ---------- dynamics: how many accents in a row ---------- */
+$('dynMax').innerHTML=[1,2,3,4,5,6,7,8].map(v=>`<button data-v="${v}">${v}</button>`).join('');
+const dynMaxUI=()=>$('dynMax').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===(S.dynMax||3))));
+$('dynMax').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; S.dynMax=+b.dataset.v; dynMaxUI(); save(); regen(); };
+dynMaxUI();
+
+/* ---------- trainer: one sheet for everything ---------- */
+const TR_STEPS=[1,2,5,10,20], TR_BARS=[1,2,4,8,16], TR_SECS=[[15,'15 שנ׳'],[30,'30 שנ׳'],[60,'1 דק׳'],[120,'2 דק׳'],[300,'5 דק׳']];
+$('trStepChips').innerHTML=TR_STEPS.map(v=>`<button class="chip" data-v="${v}">+${v}</button>`).join('');
+$('trBarsChips').innerHTML=TR_BARS.map(v=>`<button class="chip" data-v="${v}">${v}</button>`).join('');
+$('trSecChips').innerHTML=TR_SECS.map(([v,t])=>`<button class="chip" data-v="${v}">${t}</button>`).join('');
+function trSetUI(){
+  if(!$('trStepV')) return;
+  const P=trPlan(), down=S.trMax<S.trStart;
+  $('trStartV').textContent=S.trStart; $('trMaxV').textContent=S.trMax; $('trArr').textContent=down?'↘':'↗';
+  $('trStepV').textContent=(down?'−':'+')+S.trStep; $('trBarsV').textContent=S.trBars; $('trBarsU').textContent=S.trBars===1?'תיבה':'תיבות';
+  const big=S.trSec>=3600; $('trSecV').textContent=fmt(S.trSec); $('trSecU').textContent=big?'שעות':S.trSec>=60?'דקות':'שניות';
+  $('trStepChips').querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.trStep)));
+  $('trBarsChips').querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.trBars)));
+  $('trSecChips').querySelectorAll('.chip').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===S.trSec)));
+  $('trBarsRow').hidden=S.trMode!=='bars'; $('trTimeRow').hidden=S.trMode!=='time';
+  $('trTotal').innerHTML=P.ok?`<span><b>${P.list.length}</b> שלבים · ${down?'↘ יורד':'↗ עולה'}</span><span>משך <b>${fmt(P.total)}</b></span>`:'<span>ההתחלה והיעד זהים</span>';
+  const n=P.list.length, W=300, H=70, gap=n>30?1:2, w=(W-gap*(n-1))/n, lo=Math.min(S.trStart,S.trMax), hi=Math.max(S.trStart,S.trMax,lo+1);
+  $('trPrev').innerHTML=P.ok?P.list.map((b,i)=>{ const h=12+(H-14)*(b-lo)/(hi-lo); return `<rect x="${(i*(w+gap)).toFixed(1)}" y="${(H-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="url(#trg)"/>`; }).join('')+'<defs><linearGradient id="trg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff7a00"/><stop offset="1" stop-color="#ffb347"/></linearGradient></defs>':'';
+}
+const trSet=(k,v)=>{ S[k]=v; if(k!=='trSec') $(k)&&($(k).value=v); save(); updateQuick(); trSetUI(); };
+$('trStartB').onclick=()=>openKeypad({title:'טמפו התחלה',value:S.trStart,min:1,max:400,unit:'BPM',onOk:v=>trSet('trStart',v)});
+$('trMaxB').onclick=()=>openKeypad({title:'טמפו יעד',value:S.trMax,min:1,max:400,unit:'BPM',onOk:v=>trSet('trMax',v)});
+holdRepeat($('fTrSet'),'[data-ts],[data-tb],[data-tt2]',(b,n)=>{
+  if(b.dataset.ts) trSet('trStep',clamp(S.trStep+ +b.dataset.ts,1,100));
+  else if(b.dataset.tb) trSet('trBars',clamp(S.trBars+ +b.dataset.tb,1,128));
+  else { const d=+b.dataset.tt2*(n>20?12:n>10?6:1); trSet('trSec',clamp(S.trSec+d,5,9*3600)); }
+  uiTick(); });
+$('trStepChips').onclick=e=>{ const b=e.target.closest('.chip'); if(b) trSet('trStep',+b.dataset.v); };
+$('trBarsChips').onclick=e=>{ const b=e.target.closest('.chip'); if(b) trSet('trBars',+b.dataset.v); };
+$('trSecChips').onclick=e=>{ const b=e.target.closest('.chip'); if(b) trSet('trSec',+b.dataset.v); };
+$('trSecV').onclick=()=>openTimeKeypad({title:'זמן לכל שלב',onOk:sec=>trSet('trSec',clamp(sec,5,9*3600))});
+
+/* ---------- settings: tabs, professional writing ---------- */
+function restSync(){ const v=S.restLvl<=0?0:S.restLvl>=100?100:50; $('restSeg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===v))); }
+$('restSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; S.restLvl=+b.dataset.v; restSync(); save(); presetLabels(); if(rhythm) render(); };
+restSync();
+$('stabs').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const t=b.dataset.st;
+  $('stabs').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  $('sheetBody').querySelectorAll('section.sec').forEach(sec=>sec.hidden=sec.dataset.st!==t); $('sheetBody').scrollTop=0; };
+$('secSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; $('secSeg').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); $('fmSec').hidden=b.dataset.s!=='film'; $('remBox').hidden=b.dataset.s!=='rem'; };
