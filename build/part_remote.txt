@@ -101,7 +101,7 @@ function applyPhoneS(ns){
   syncUI();
   const ch=k=>JSON.stringify(old[k])!==JSON.stringify(S[k]);
   if(old.bpm!==S.bpm) retime(old.bpm);
-  if(['grids','level','num','den','bars'].some(ch)) requestNew(); else if(['restLvl','ties','showCount','sextCount','stick','dynOn'].some(ch)&&rhythm) render();
+  if(['grids','level','num','den','bars'].some(ch)) requestNew(); else if(['restLvl','ties','dots','showCount','sextCount','stick','dynOn'].some(ch)&&rhythm) render();
   RC.applying=false; save(); hostSendState(true);
 }
 /* computer side: send the screen to the phone */
@@ -139,7 +139,7 @@ function syncUI(){
   setBpm(S.bpm); syncGrids(); meterSync(); barsSync(); mbSync();
   ['repeats','mSub','sextCount','trMode','clockMode','clickSnd'].forEach(id=>{ const el=$(id); el&&el._sync&&el._sync(); });
   $('level').value=S.level; $('levelOut').textContent=S.level; restSync(); sndDraw(); gapUI(); trSetUI(); dynMaxUI();
-  ['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]); $('stickOn').checked=!!S.stick;
+  ['clickOn','noteSound','countIn','showCount','ties','dots','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]); $('stickOn').checked=!!S.stick;
   ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>$(k).value=S[k]);
   secSync(); buildCols(); renderSongs(); renderTrPresets(); renderGenPresets(); updateQuick(); clockTick(); applyVol();
 }

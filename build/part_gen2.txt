@@ -57,8 +57,13 @@ function pick(pool,T){
   for(let i=0;i<pool.length;i++){ r-=w[i]; if(r<=0) return {...pool[i].bt,slots:pool[i].bt.slots.slice()}; }
   const p=pool[pool.length-1]; return {...p.bt,slots:p.bt.slots.slice()};
 }
+const E8={3:{'100':1,'110':1,'111':2,'101':3,'000':3,'011':6,'010':9,'001':9},2:{'10':1,'11':2,'00':3,'01':6},1:{'1':1}};
 function genGroup(k,den,T){
   if(den===4) return pick(qPool(),T);
+  if(modeOf()==='path'){ const L=Math.min(S.level,PATH_MAX), tb=E8[k]||E8[3];
+    if(L>=4&&Math.random()<0.3){ const d=0.35+0.05*Math.min(8,L-4); return {t:'e',k,g:k*2,slots:Array.from({length:k*2},(_,i)=>i===0?Math.random()<0.8:Math.random()<d)}; }
+    const c=Object.keys(tb).filter(x=>tb[x]<=L), nw=c.filter(x=>tb[x]===L); const pickC=nw.length&&Math.random()<0.4?nw:c, x=pickC[Math.floor(Math.random()*pickC.length)];
+    return {t:'e',k,g:k,slots:[...x].map(ch=>ch==='1')}; }
   const d=density();
   const opts=[]; if(S.grids[1]||S.grids[2]||S.grids[3]||S.grids.L) opts.push(k); if(S.grids[4]||S.grids[6]) opts.push(k*2); if(!opts.length) opts.push(k);
   const g=opts[Math.floor(Math.random()*opts.length)];
@@ -79,11 +84,24 @@ function pickVar(T,lo,used,fam){
   const fresh=pl.filter(p=>!used.has(beatCode(p.bt))&&p.d<=T+1); if(fresh.length) pl=fresh;
   return pick(pl,beatT(T,lo));
 }
-/* ---------- path mode: a teaching ladder; each level adds patterns, earlier ones stay for review ---------- */
-const LADDER_D={'4:1000':1,'4:1010':1,'4:0000':2,'4:0010':2,'4:1111':3,'4:1011':5,'4:1110':5,'4:0111':5,'4:0011':5,'4:1001':6,'4:1100':6,'4:1101':7,'4:0100':8,'4:0110':8,'4:0001':8,'4:0101':9};
-const LADDER_T={'3:111':1,'3:101':2,'3:110':3,'3:011':3,'Q:101010':4,'3:010':5,'3:001':5};
-const DESC_D=['רבע, 2 שמיניות','הפסקות: רבע, שמינית + שמינית','4 שש־עשריות','רבע עם נקודה בין פעמות','שמינית + 2 שש־עשריות ולהפך, הפסקה + 3 שש־עשריות','שמינית עם נקודה + שש־עשרית ולהפך','שש־עשרית־שמינית־שש־עשרית','סינקופות על ה-e וה-a','הפסקות פנימיות קשות','הכל, כולל שילובים צפופים'];
-const DESC_T=['טריולה מלאה','טריולה עם הפסקה באמצע','1 & · ו־· & a','טריולת רבעים מלאה','תו בודד על ה-& או על ה-a','טריולת רבעים עם הפסקות, טריולת חצאים','סקסטולה מלאה וסקסטולות פשוטות','סקסטולות בינוניות','סקסטולות מעורבות','הכל'];
+/* ---------- path mode: a teaching ladder of 13 levels; each level adds patterns, earlier ones stay for review ----------
+   duple scale: 1 quarters/halves/wholes · 2 eighths · 3 eighth on the & · 4 full 16ths · 5 three on the beat · 6 three with syncopation
+   7 two on the beat · 8 two without the beat · 9 e alone, a alone, 1-a · 10 syncopation mix · 11 ties in the beat · 12 ties over the beat · 13 ties over the barline
+   triplet track runs beside it, sextuplets in five steps (7..11) */
+const PATH_MAX=13;
+const LADDER_D={'4:1000':1,'4:0000':1,'4:1010':2,'4:0010':3,'4:1111':4,'4:1110':5,'4:1011':5,'4:1101':6,'4:0111':6,'4:1100':7,'4:0011':7,'4:0110':8,'4:0101':8,'4:0100':9,'4:0001':9,'4:1001':9};
+const SEXT_ST={'6:111111':7,'6:111100':8,'6:100111':8,'6:111000':8,'6:111110':9,'6:101111':9,'6:111011':9,'6:111010':10,'6:101110':10,'6:101011':10,'6:000111':11,'6:011111':11,'6:001111':11,'6:110111':11,'6:111101':11,'6:110110':11};
+const LADDER_T=Object.assign({'3:111':2,'3:101':4,'3:110':4,'3:011':6,'3:010':9,'3:001':9,'Q:101010':12},SEXT_ST);
+const DESC_D=['רבעים, חצאים ושלמים','שמיניות','שמינית על ה־&','4 שש־עשריות','3 על הפעמה: 16-16-8, 8-16-16','3 עם סינקופה: 16-8-16, הפסקה + 3','2 על הפעמה: 1e, &a','2 בלי הפעמה: e&, e-a','e לבד, a לבד, 1-a','ערבוב סינקופות','קשתות בתוך הפעמה','קשתות מעל הפעמה','קשתות מעל קו התיבה'];
+const DESC_T=['','טריולה מלאה מול שמיניות','מעבר 2↔3 בתוך התיבה','2 מתוך 3 על הפעמה','','פעמה ריקה בטריולה','סקסטולה מלאה','סקסטולות 3+3','1 מתוך 3 · סקסטולות 2+2+2','סקסטולות עם הפסקות','סקסטולות קשות · כתיבה מקוצרת','טריולת רבעים','טריולת חצאים וקשתות'];
+const LMAX=()=>(S.mode||'free')==='path'?PATH_MAX:10;
+// syncopation of one beat (Longuet-Higgins & Lee): a note followed by silence on a stronger spot; a missing downbeat counts too
+const MW={1:[0],2:[0,-1],3:[0,-2,-2],4:[0,-2,-1,-2],6:[0,-3,-2,-1,-2,-3]};
+function synOf(code){
+  const [f,bits]=code.split(':'); if(f==='Q'||f==='H') return 2; const g=+f, b=[...bits].map(x=>x==='1'), w=MW[g]||MW[4];
+  if(!b.some(Boolean)) return 0.5; let s=b[0]?0:1;
+  b.forEach((x,i)=>{ if(!x) return; for(let j=i+1;j<g&&!b[j];j++) s+=Math.max(0,w[j]-w[i]); });
+  return s; }
 // level fixes sent from the rhythm map (code: level, 0 = not in the path)
 const LVL_EDIT={};
 let ALLP=null;
@@ -95,11 +113,9 @@ function allPatterns(){
   [2,4].forEach(k=>['10','11','00'].forEach(a=>['10','11','00'].forEach(b=>['10','11','00'].forEach(c=>{ const x=a+b+c; if(x==='000000') return; const bt={t:'L',k,g:6,slots:[...x].map(ch=>ch==='1')}; const code=beatCode(bt); if(!m.has(code)) m.set(code,{bt,code,k}); }))));
   const list=[...m.values()];
   // sextuplets that stay in the app are split into three steps by difficulty
-  const sx=list.filter(p=>p.code[0]==='6'&&!EXCL.has(p.code)).sort((a,b)=>diffOf(a.code)-diffOf(b.code));
-  const sxL={}; sx.forEach((p,i)=>{ sxL[p.code]=p.code==='6:111111'?7:7+Math.min(2,Math.floor(3*i/sx.length)); });
   list.forEach(p=>{
-    const c=p.code; p.trk=c[0]==='4'?'d':'t';
-    p.lvl=LVL_EDIT[c]!=null?LVL_EDIT[c]:LADDER_D[c]||LADDER_T[c]||sxL[c]||((c[0]==='Q'||c[0]==='H')&&!EXCL.has(c)?6:0);
+    const c=p.code; p.trk=c==='4:1000'||c==='4:0000'?'b':c[0]==='4'?'d':'t'; // quarters belong to both tracks
+    p.lvl=LVL_EDIT[c]!=null?LVL_EDIT[c]:LADDER_D[c]||LADDER_T[c]||((c[0]==='Q'||c[0]==='H')&&!EXCL.has(c)?13:0); p.syn=synOf(c);
     p.ok=c==='Q:101010'||!EXCL.has(c)||!!LVL_EDIT[c];
   });
   return ALLP=list;
@@ -109,16 +125,24 @@ const modeOf=()=>S.mode||'free';
 function poolNow(){
   const all=allPatterns();
   if(modeOf()==='manual'){ const on=new Set(S.manual||[]); let pl=all.filter(p=>on.has(p.code)); if(!pl.length) pl=all.filter(p=>p.code==='4:1000'); return pl.map(p=>({p,w:1})); }
-  const L=S.level, dOn=S.trkD!==false, tOn=!!S.trkT||!dOn;
-  const pl=all.filter(p=>p.ok&&p.lvl&&p.lvl<=L&&(p.trk==='d'?dOn:tOn));
+  const L=Math.min(S.level,PATH_MAX), dOn=S.trkD!==false, tOn=!!S.trkT||!dOn, cap=synCap();
+  const pl=all.filter(p=>p.ok&&p.lvl&&p.lvl<=L&&(p.trk==='b'||(p.trk==='d'?dOn:tOn)));
   const nw=pl.filter(p=>p.lvl===L).length, od=pl.length-nw;
-  return pl.map(p=>{ let w=nw&&od?(p.lvl===L?0.4/nw:0.6/od):1/pl.length; if(p.code==='4:0000') w*=0.5; if(p.k>1) w*=0.25; return {p,w}; });
+  return pl.map(p=>{ let w=nw&&od?(p.lvl===L?0.4/nw:0.6/od):1/pl.length; if(p.code==='4:0000') w*=0.5; if(p.k>1) w*=0.25;
+    if(p.syn>cap) w*=Math.exp(-(p.syn-cap)*1.3); if(L===10&&p.syn>=1) w*=1.8; return {p,w}; });
 }
+// the syncopation ceiling inside a level: starts at strong full beats, opens up over the first rhythms of the level
+const SYN={lvl:0,n:0};
+function synCap(){ return SYN.lvl!==S.level?0:Math.min(6,0.4+SYN.n*0.6); }
+function synStep(){ if(SYN.lvl!==S.level){ SYN.lvl=S.level; SYN.n=0; } else SYN.n++; }
 function drawW(items){ let s=items.reduce((a,b)=>a+b.w,0), r=Math.random()*s; for(const it of items){ r-=it.w; if(r<=0) return it.p; } return items[items.length-1].p; }
-function genLadderBar(){
-  const pool=poolNow(), q=pool.filter(x=>x.p.k===1), used=new Set(), gr=[]; let i=0;
+function genLadderBar(fam){
+  let pool=poolNow(); if(fam){ const f=pool.filter(x=>x.p.trk==='b'||(x.p.trk==='d')===(fam==='d')); if(f.length) pool=f; }
+  const q=pool.filter(x=>x.p.k===1), used=new Set(), gr=[]; let i=0;
   while(i<S.num){
-    const fit=pool.filter(x=>x.p.k===1||(i%2===0&&i+x.p.k<=S.num));
+    // beat 1 leans to a note on the downbeat while the level is new
+    let fit=pool.filter(x=>x.p.k===1||(i%2===0&&i+x.p.k<=S.num));
+    if(i===0&&synCap()<2) fit=fit.map(x=>({p:x.p,w:x.w*(x.p.bt.slots[0]?1:0.3)}));
     let p=drawW(fit.length?fit:pool);
     if(p.k>1&&(i%2||i+p.k>S.num)) p=null;
     if(p&&p.k===1&&used.has(p.code)){ const fresh=q.filter(x=>!used.has(x.p.code)); if(fresh.length) p=drawW(fresh); }
@@ -126,7 +150,11 @@ function genLadderBar(){
     if(!p){ gr.push({t:'q',k:1,g:1,slots:[true]}); i++; continue; }
     used.add(p.code); gr.push(Object.assign({},p.bt,{slots:p.bt.slots.slice()})); i+=p.k;
   }
-  if(modeOf()==='path'&&S.level<4) gr.noExt=true;
+  if(modeOf()==='path'){ gr.lv=Math.min(S.level,PATH_MAX);
+    // both tracks from level 3: a bar holds both feels (2 and 3 side by side)
+    const dOn=S.trkD!==false, tOn=!!S.trkT||!dOn;
+    if(!fam&&dOn&&tOn&&S.level>=3&&gr.length>=2&&gr.every(x=>x.t==='q')){ const fams=new Set(gr.map(famOf));
+      if(fams.size===1){ const need=fams.has('b')?'t':'b', cand=q.filter(x=>famOf(x.p.bt)===need); if(cand.length){ const j=1+Math.floor(Math.random()*(gr.length-1)), p=drawW(cand); gr[j]=Object.assign({},p.bt,{slots:p.bt.slots.slice()}); } } } }
   return gr;
 }
 function genRhythm(){
@@ -135,9 +163,11 @@ function genRhythm(){
   const only=![1,2,4,3,6].some(g=>S.grids[g]);
   const hasB=S.grids[2]||S.grids[4], hasT=S.grids[3]||S.grids[6]||S.grids.L;
   let lastCode='';
+  const path=modeOf()==='path', twoT=path&&S.trkD!==false&&!!S.trkT&&S.level===2;
+  if(path) synStep();
   for(let b=0;b<S.bars;b++){
     let gr=[];
-    if(S.den===4&&modeOf()!=='free'){ gr=genLadderBar(); }
+    if(S.den===4&&modeOf()!=='free'){ gr=genLadderBar(twoT?(b%2?'t':'d'):null); }
     else if(S.den===4){
       const used=new Set(); if(lastCode) used.add(lastCode);
       let i=0;
@@ -159,6 +189,11 @@ function genRhythm(){
     } else gr=groups.map(k=>genGroup(k,S.den,T));
     if(!gr.some(x=>x.slots.some(Boolean))){ const x=gr[Math.floor(Math.random()*gr.length)]; x.slots[0]=true; }
     gr.seed=1+Math.floor(Math.random()*2e9);
+    if(path&&!gr.lv) gr.lv=Math.min(S.level,PATH_MAX);
+    // level 13: now and then the last note of a bar is tied into the next bar
+    const pv=bars[b-1];
+    if(path&&S.den===4&&S.level>=13&&pv&&Math.random()<0.4){ const lb=pv[pv.length-1], fb=gr[0];
+      if(lb&&lb.t==='q'&&lb.slots[lb.g-1]&&fb&&fb.t==='q'&&[1,2,4,3].includes(fb.g)&&gr.some((x,j)=>j>0&&x.slots.some(Boolean))){ fb.slots=fb.slots.slice(); fb.slots[0]=false; gr.ti=true; pv.to=true; } }
     if(S.dynOn) gr.acc=pickAccents(gr,S.den,dynStage());
     bars.push(gr);
   }

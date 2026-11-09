@@ -535,7 +535,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
     <section class="sec" data-st="read">
       <div class="field"><div class="srow"><span class="sic">✍</span><div><b>כתיבה מקצועית</b><small>איך נכתבות הפסקות בתוך פעמה</small></div></div>
         <div class="seg3" id="restSeg"><button data-v="0">מקצוען</button><button data-v="50">מעורב</button><button data-v="100">חובבן</button></div></div>
-      <label class="toggle"><input type="checkbox" id="ties"><span><b>חיבורים (קשתות)</b><small>תווים מחוברים בין פעמות</small></span></label>
+      <label class="toggle"><input type="checkbox" id="dots"><span><b>כתיבה מנוקדת</b><small>רבע ושמינית עם נקודה. כבוי: אותם קצבים, עם הפסקות ושש־עשריות</small></span></label>
+      <label class="toggle"><input type="checkbox" id="ties"><span><b>חיבורים (קשתות)</b><small>תווים מחוברים בין פעמות. במסלול הקשתות באות לפי הרמה</small></span></label>
       <div class="field"><div class="srow"><span class="sic">🔁</span><div><b>מקצב חדש אחרי</b></div></div><div class="chips" id="repeats"></div></div>
       <label class="toggle"><input type="checkbox" id="tapOn"><span><b>ניגון יחד</b><small>מתופפים על המסך ומקבלים ניקוד</small></span></label>
       <div class="srow act" id="tapCalBtn" role="button" tabindex="0"><span class="sic">🎯</span><div><b>כיול הקשה</b><small id="tapCalOut">מומלץ פעם אחת לכל טלפון</small></div><span class="go">כייל ‹</span></div>
@@ -625,7 +626,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
         <input type="range" id="level" min="1" max="10" step="1" hidden>
         <div class="lvl" id="lvlBox">
           <div class="lvltrack" id="lvlTrack" role="slider" tabindex="0" aria-label="מורכבות" aria-valuemin="1" aria-valuemax="10">
-            <div class="lvlticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="lvlticks" id="lvlTicks"></div>
             <div class="lvlfill" id="lvlFill"><div class="flame"><b></b><b></b><b></b></div></div>
             <div class="lvlthumb" id="lvlThumb"></div>
           </div>
@@ -3029,7 +3030,7 @@ var qrcode = function() {
 (function(){
 const $=id=>document.getElementById(id);
 const SECRET_OPEN={{SECRET_OPEN}};
-const DEF={tab:'gen',bpm:80,grids:{1:false,2:true,4:true,3:false,6:false,L:false},level:3,num:4,den:4,bars:4,repeats:1,clickOn:true,noteSound:true,countIn:true,showCount:false,restLvl:0,ties:false,sextCount:'mix',
+const DEF={tab:'gen',bpm:80,grids:{1:false,2:true,4:true,3:false,6:false,L:false},level:3,num:4,den:4,bars:4,repeats:1,clickOn:true,noteSound:true,countIn:true,showCount:false,restLvl:0,ties:false,dots:false,sextCount:'mix',
   mBeats:4,mSub:1,mAcc:[2,1,1,1],gapOn:false,gapPlay:2,gapMute:2,trStart:80,trMax:140,trStep:5,trMode:'bars',trBars:4,trSec:30,
   clockMode:'watch',timerSec:300,songs:[],clickSnd:'pro',trPresets:[],trLoaded:null,songLoaded:null,genPresets:[],genLoaded:null,uiSnd:true,vol:90,mute:false,sinkId:'',
   tapOn:false,tapCal:0,fmClean:false,fmRec:true,fmLay:'half',fmBars:4,fmFacing:'user',hpLag:null,fmCam:true,fmMic:true,fmTitle:'תצליח לקרוא את זה ב־{BPM} BPM?',fmHandle:'@nivdrums',fmEnd:'הגעת עד הסוף? תכתוב לי בתגובות 👇',fmMode:'lvl',fmRounds:5,fmCount:true,fmStep:10,clkClick:true,clkStopClick:true,dynOn:false,stick:false,dynAuto:true,dynLvl:1,mode:'path',trkD:true,trkT:false,manual:['4:1000','4:1010','4:0000','4:0010','4:1111']};
@@ -3338,7 +3339,7 @@ function updateQuick(){
   $('qMeter').innerHTML=FRAC(S.num,S.den); $('vMeter').outerHTML=vizDots(S.num).replace('class="viz','id="vMeter" class="viz');
   $('qBars').textContent=S.bars; $('vBars').className='viz vsegs'+(S.bars>8?' many':''); $('vBars').innerHTML='<i></i>'.repeat(Math.min(S.bars,12));
   const man=(S.mode||'free')==='manual', L=S.level; $('qLevel').textContent=man?'ידני':L; $('qLevel').className=man?'':'hot';
-  $('vLevel').className='viz vfire'; $('vLevel').innerHTML=[...Array(5)].map((_,i)=>`<i class="${!man&&i<Math.ceil(L/2)?'on':''}" style="height:${30+i*17}%;--c:${LVL_C[Math.min(9,i*2+1)]}"></i>`).join('');
+  $('vLevel').className='viz vfire'; $('vLevel').innerHTML=[...Array(5)].map((_,i)=>`<i class="${!man&&i<Math.ceil(L/LMAX()*5)?'on':''}" style="height:${30+i*17}%;--c:${LVL_C[Math.min(9,i*2+1)]}"></i>`).join('');
   $('qBpm').textContent=S.bpm; $('qTempo').textContent=tempoName(S.bpm).toUpperCase();
   $('mMeterBtn').innerHTML=FRAC(S.mBeats,4); $('vMBeats').outerHTML=vizDots(S.mBeats,S.mAcc).replace('class="viz','id="vMBeats" class="viz');
   $('qMSub').textContent=SUBN[S.mSub]; $('vMSub').innerHTML=SUBI[S.mSub];
@@ -3507,13 +3508,15 @@ $('level').value=S.level; $('levelOut').textContent=S.level;
 // vertical "fire" slider: bottom = easiest, top = pro; heats up toward red and glows at the top
 const LVL_C=['#ffd29a','#ffc27a','#ffb347','#ffa63a','#ff9f1c','#ff8a1c','#ff7a1c','#ff6a2a','#ff4a1f','#ff2a10'];
 const LVL_N=['מתחיל','מתחיל','בסיסי','בסיסי','בינוני','בינוני','מתקדם','מתקדם','קשה','מקצוען'];
-function lvlUI(v){ v=clamp(Math.round(v),1,10); const h=(v-1)/9, box=$('lvlBox');
-  box.style.setProperty('--c',LVL_C[v-1]); box.style.setProperty('--heat',h.toFixed(3)); box.classList.toggle('hot',v>=9);
+// path mode has 13 levels, free mode 10; colors and names stretch over whichever it is
+function lvlUI(v){ const M=LMAX(); v=clamp(Math.round(v),1,M); const h=(v-1)/(M-1), ci=Math.round(h*9), box=$('lvlBox');
+  if($('lvlTicks').children.length!==M) $('lvlTicks').innerHTML='<i></i>'.repeat(M); $('lvlTrack').setAttribute('aria-valuemax',M);
+  box.style.setProperty('--c',LVL_C[ci]); box.style.setProperty('--heat',h.toFixed(3)); box.classList.toggle('hot',h>=0.85);
   $('lvlFill').style.height=`calc(54px + (100% - 64px) * ${h.toFixed(3)})`; $('lvlThumb').style.bottom=`calc(32px + (100% - 64px) * ${h.toFixed(3)})`;
-  $('levelOut').textContent=v; $('levelName').textContent=LVL_N[v-1]; $('lvlTrack').setAttribute('aria-valuenow',v); }
-function lvlSet(v){ v=clamp(Math.round(v),1,10); lvlUI(v); if(v===S.level) return; S.level=v; $('level').value=v; save(); updateQuick(); regen(); }
+  $('levelOut').textContent=v; $('levelName').textContent=LVL_N[ci]; $('lvlTrack').setAttribute('aria-valuenow',v); }
+function lvlSet(v){ v=clamp(Math.round(v),1,LMAX()); lvlUI(v); if(v===S.level) return; S.level=v; $('level').value=v; save(); updateQuick(); regen(); }
 (()=>{ const tr=$('lvlTrack'); let drag=false, last=S.level;
-  const at=e=>{ const r=tr.getBoundingClientRect(); return 1+clamp((r.bottom-32-e.clientY)/(r.height-64),0,1)*9; };
+  const at=e=>{ const r=tr.getBoundingClientRect(); return 1+clamp((r.bottom-32-e.clientY)/(r.height-64),0,1)*(LMAX()-1); };
   tr.addEventListener('pointerdown',e=>{ drag=true; tr.setPointerCapture(e.pointerId); last=Math.round(at(e)); lvlUI(last); if(S.uiSnd) uiTick(); });
   tr.addEventListener('pointermove',e=>{ if(!drag) return; const v=Math.round(at(e)); if(v!==last){ last=v; lvlUI(v); if(S.uiSnd) uiTick(); } });
   const up=()=>{ if(!drag) return; drag=false; lvlSet(last); };
@@ -3546,13 +3549,13 @@ function modeUI(){
   $('modeSeg').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.m===m)));
   $('lvlBox').hidden=m==='manual'; $('pathPart').hidden=m!=='path'; $('freePart').hidden=m!=='free'; $('manPart').hidden=m!=='manual';
   if(m==='path'){ const d=S.trkD!==false, t=!!S.trkT||!d; $('trkD').setAttribute('aria-pressed',String(d)); $('trkT').setAttribute('aria-pressed',String(t));
-    const L=S.level, part=(on,name,D)=>on?`<div><b>${name}:</b> ${L>1?D.slice(0,L-1).join(' · ')+' · ':''}<span class="new">${L<10?'חדש: ':''}${D[L-1]}</span></div>`:'';
+    const L=Math.min(S.level,PATH_MAX), part=(on,name,D)=>{ if(!on) return ''; const old=D.slice(0,L-1).filter(Boolean), nw=D[L-1]; return `<div><b>${name}:</b> ${old.join(' · ')}${old.length&&nw?' · ':''}${nw?`<span class="new">חדש: ${nw}</span>`:(old.length?'':'—')}</div>`; };
     $('pathInc').innerHTML=`<b>רמה ${L} כוללת</b>`+part(d,'מרובעים',DESC_D)+part(t,'משולשים',DESC_T); }
   if(m==='free'){ const mk=list=>list.map(([g,n])=>`<button class="gc" data-g="${g}" aria-pressed="${!!S.grids[g]}">${gIcon(g)}<small>${n}</small></button>`).join(''); $('freeD').innerHTML=mk(FREE_D); $('freeT').innerHTML=mk(FREE_T); }
   if(m==='manual') manRender();
 }
 $('trkDIc').innerHTML=SUBI[1]+SUBI[2]+SUBI[4]; $('trkTIc').innerHTML=SUBI[3]+SUBI[6];
-$('modeSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.m===S.mode) return; S.mode=b.dataset.m; save(); updateQuick(); modeUI(); regen(); };
+$('modeSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.m===S.mode) return; S.mode=b.dataset.m; if(S.level>LMAX()) S.level=LMAX(); $('level').value=S.level; lvlUI(S.level); save(); updateQuick(); modeUI(); regen(); };
 const trkToggle=k=>{ const d=S.trkD!==false, t=!!S.trkT||!d; if(k==='d'){ if(d&&!t) return; S.trkD=!d; if(!S.trkD) S.trkT=true; } else { if(t&&!d) return; S.trkT=!t; } save(); updateQuick(); modeUI(); regen(); };
 $('trkD').onclick=()=>trkToggle('d'); $('trkT').onclick=()=>trkToggle('t');
 $('freePart').onclick=e=>{ const c=e.target.closest('.gc'), a=e.target.closest('.gall');
@@ -3580,8 +3583,8 @@ $('manGroups').onclick=e=>{
   else return;
   S.manual=[...set]; save(); updateQuick(); if(a||z) manRender(); else $('manCount').textContent=`${set.size} צורות נבחרו`; clearTimeout(manRender._t); manRender._t=setTimeout(regen,350);
 };
-['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd','askDelOn'].forEach(k=>{
-  const el=$(k); el.checked=!!S[k]; el.onchange=()=>{S[k]=el.checked; save(); updateQuick(); if(k==='gapOn') gapUI(); if((k==='showCount'||k==='ties')&&rhythm) render();};
+['clickOn','noteSound','countIn','showCount','ties','dots','gapOn','uiSnd','askDelOn'].forEach(k=>{
+  const el=$(k); el.checked=!!S[k]; el.onchange=()=>{S[k]=el.checked; save(); updateQuick(); if(k==='gapOn') gapUI(); if((k==='showCount'||k==='ties'||k==='dots')&&rhythm) render();};
 });
 ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>bindNum(k,k));
 const secSync=()=>{ $('trMin').value=Math.floor(S.trSec/60); $('trSecs').value=S.trSec%60; if(typeof trSetUI==='function') trSetUI(); };

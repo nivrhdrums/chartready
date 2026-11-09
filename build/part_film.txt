@@ -91,7 +91,7 @@ function fmSync(){
   $('fmCamRow').hidden=false; $('fmMicRow').hidden=!S.fmRec; // the camera also shows on screen for the phone's own screen recording $('fmRecHint').hidden=true;
   $('fmRoundsF').hidden=S.fmMode==='one'; $('fmStepF').hidden=S.fmMode!=='bpm';
   $('fmRoundsV').textContent=S.fmRounds; $('fmStepV').textContent='+'+(S.fmStep||10);
-  $('fmModeHint').textContent=S.fmMode==='lvl'?`מהמורכבות הנוכחית (${S.level}) ועד 10.`:S.fmMode==='bpm'?`מ־⁦${S.bpm} BPM⁩ ועוד ${S.fmStep||10} בכל סבב.`:'מקצב אחד בהגדרות הנוכחיות.';
+  $('fmModeHint').textContent=S.fmMode==='lvl'?`מהמורכבות הנוכחית (${S.level}) ועד ${LMAX()}.`:S.fmMode==='bpm'?`מ־⁦${S.bpm} BPM⁩ ועוד ${S.fmStep||10} בכל סבב.`:'מקצב אחד בהגדרות הנוכחיות.';
 }
 ['fmClean','fmRec','fmCam','fmMic','fmCount','tapOn'].forEach(k=>{ const el=$(k); el.checked=!!S[k]; el.onchange=()=>{ S[k]=el.checked; save(); fmSync(); tapUI(); }; });
 ['fmTitle','fmHandle','fmEnd'].forEach(k=>{ const el=$(k); el.value=S[k]||''; el.oninput=()=>{ S[k]=el.value; save(); }; });
@@ -102,7 +102,7 @@ fmSync();
 function filmApply(i){
   const o=FILM.orig, n=FILM.rounds=S.fmMode==='one'?1:S.fmRounds;
   S.level=o.level; S.bpm=o.bpm;
-  if(S.fmMode==='lvl'&&n>1) S.level=Math.round(o.level+(10-o.level)*i/(n-1));
+  if(S.fmMode==='lvl'&&n>1) S.level=Math.round(o.level+(LMAX()-o.level)*i/(n-1));
   if(S.fmMode==='bpm') S.bpm=clamp(o.bpm+i*(S.fmStep||10),1,400);
 }
 function filmMeta(){
@@ -381,8 +381,8 @@ var HIST={runs:[],pend:[],slot:[],cur:null,sel:new Set(),open:null};
 try{ const h=JSON.parse(localStorage.getItem('cr_hist')||'null'); if(h&&Array.isArray(h.runs)) HIST.runs=h.runs; }catch(e){}
 function histSave(){ try{ localStorage.setItem('cr_hist',JSON.stringify({runs:HIST.runs})); }catch(e){} }
 const histOff=()=>!!((FILM&&FILM.on)||RC.remoteMode||RC.applying);
-const histEntry=(bar,r)=>({b:bar.map(x=>({t:x.t,k:x.k,g:x.g,slots:x.slots.slice()})),s:bar.seed||1,n:r.num,d:r.den,ne:!!bar.noExt,a:bar.acc||null,p:false});
-const histBar=e=>{ const b=e.b.map(x=>Object.assign({},x,{slots:x.slots.slice()})); b.seed=e.s; if(e.ne) b.noExt=true; if(e.a) b.acc=e.a.slice(); return b; };
+const histEntry=(bar,r)=>({b:bar.map(x=>({t:x.t,k:x.k,g:x.g,slots:x.slots.slice()})),s:bar.seed||1,n:r.num,d:r.den,ne:!!bar.noExt,a:bar.acc||null,lv:bar.lv||0,ti:!!bar.ti,to:!!bar.to,p:false});
+const histBar=e=>{ const b=e.b.map(x=>Object.assign({},x,{slots:x.slots.slice()})); b.seed=e.s; if(e.ne) b.noExt=true; if(e.a) b.acc=e.a.slice(); if(e.lv) b.lv=e.lv; if(e.ti) b.ti=true; if(e.to) b.to=true; return b; };
 function histPush(i,bar,r){
   if(histOff()) return;
   const e=histEntry(bar,r); HIST.slot[i]=e;
@@ -466,7 +466,7 @@ function fsCamStop(){ if(FS_STREAM){ FS_STREAM.getTracks().forEach(t=>t.stop());
 function fsTiles(){
   const one=S.fmMode==='one';
   const T=(k,lbl,ic,val,cls,dis)=>`<button class="fs-tile ${cls||''}" data-fs="${k}" ${dis?'disabled':''}><small>${lbl}</small><span class="ic">${ic}</span><b class="${/^[\d+→\s−-]+$/.test(String(val))?'n':''}">${val}</b></button>`;
-  const step=S.fmMode==='bpm'?'+'+(S.fmStep||10)+' BPM':S.fmMode==='lvl'?`${S.level}→10`:'—';
+  const step=S.fmMode==='bpm'?'+'+(S.fmStep||10)+' BPM':S.fmMode==='lvl'?`${S.level}→${LMAX()}`:'—';
   $('fsTiles').innerHTML=
     T('mode','מבנה','📈',FS_MODE[S.fmMode])+T('rounds','סבבים','🔁',one?'—':S.fmRounds,'',one)+T('step',S.fmMode==='bpm'?'קפיצה':'רמות','↗',step,'o',one||S.fmMode==='lvl')+
     T('lay','פריסה','▦',FS_LAY[S.fmLay||'half'])+T('count','ספירה','🥁',S.fmCount?'פועלת':'כבויה',S.fmCount?'':'off')+T('text','טקסט','Aa','ערוך')+
