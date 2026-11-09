@@ -1,6 +1,6 @@
 // ChartReady offline support: keeps the app and its fonts on the device after the first visit.
 // Change VERSION whenever you upload a new build so phones pick up the update.
-const VERSION = 'chartready-star-2.0.21';
+const VERSION = 'chartready-star-2.0.22';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
