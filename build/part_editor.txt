@@ -1,5 +1,8 @@
-/* ---------- video editor: after filming, move the camera, edit texts, trim, then render a new file ---------- */
-var ED=null, ED_SRC=null, ED_DEST=null, ED_PREV=null;
+/* ---------- video editor: after filming, move the camera, edit texts, mix, trim, then render the files ---------- */
+// one timeline for everything: second 0 = the moment recording started (the screen video starts there too).
+// the app sound is rebuilt from the sound log; the camera file (camera + mic together) is placed on the timeline
+// by matching its mic against the mic heard on the audio clock while filming; headphone delay moves camera+mic as one.
+var ED=null;
 function edReady(v){ return new Promise(res=>{
   const done=()=>{ v.removeEventListener('timeupdate',fix); res(); };
   // recorded webm has no length; jumping far ahead makes the browser work it out
@@ -8,48 +11,101 @@ function edReady(v){ return new Promise(res=>{
   v.addEventListener('loadedmetadata',()=>{ if(isFinite(v.duration)) done(); else { v.addEventListener('timeupdate',fix); v.currentTime=1e101; } },{once:true});
   setTimeout(res,2500); }); }
 const relY=id=>{ const f=$('fFrame').getBoundingClientRect(), r=$(id).getBoundingClientRect(); return r.height?((r.top+r.height/2)-f.top)/f.height:null; };
+/* loudness tools: one value per millisecond */
+function envOf(buf){ const d=buf.getChannelData(0), sr=buf.sampleRate, n=Math.floor(d.length*1000/sr)+1, e=new Float32Array(n), f=1000/sr;
+  for(let i=0;i<d.length;i++){ const k=Math.floor(i*f), v=d[i]<0?-d[i]:d[i]; if(v>e[k]) e[k]=v; } return e; }
+// rises in loudness = hits
+function onsetsOf(env){ const n=env.length, o=new Float32Array(n); for(let i=4;i<n;i++){ const d=(env[i]||0)-(env[i-4]||0); o[i]=d>0?d:0; } return o; }
+// the shift (ms) that best puts hits of `on` on the given times (ms)
+function lagToTimes(on,times,lo,hi){ const ts=times.slice(0,64); if(ts.length<2) return null; let best=-1, bl=null;
+  for(let L=lo;L<=hi;L++){ let s=0; for(const t of ts){ const c=Math.round(t)+L; let m=0; for(let j=c-3;j<=c+3;j++) if(j>=0&&j<on.length&&on[j]>m) m=on[j]; s+=m; } if(s>best){ best=s; bl=L; } }
+  return best>0?bl:null; }
+// the shift D (ms) with b[t+D] ≈ a[t]; coarse in 10ms steps, then exact. null when the match is weak
+function matchShift(a,b,range){
+  const pool=(x,k)=>{ const o=new Float32Array(Math.ceil(x.length/k)); for(let i=0;i<x.length;i++){ const j=(i/k)|0; if(x[i]>o[j]) o[j]=x[i]; } return o; };
+  const score=(A,B,D,st)=>{ let s=0; for(let t=0;t<A.length;t+=st){ const u=t+D; if(u>=0&&u<B.length) s+=A[t]*B[u]; } return s; };
+  const A10=pool(a,10), B10=pool(b,10), R=Math.round(range/10), sc=[]; let best=-1, bd=0;
+  for(let D=-R;D<=R;D++){ const s=score(A10,B10,D,1); sc.push(s); if(s>best){ best=s; bd=D; } }
+  const med=sc.slice().sort((x,y)=>x-y)[sc.length>>1]||0; if(!(best>0)||best<med*2.5) return null;
+  let b1=-1, D1=bd*10; for(let D=bd*10-15;D<=bd*10+15;D++){ const s=score(a,b,D,1); if(s>b1){ b1=s; D1=D; } }
+  return D1; }
+/* the app sound, rebuilt from the log on a silent audio context: clicks and notes come out as two clean tracks */
+async function edStem(log,dur,which,accR){
+  const sr=ctx.sampleRate, off=new OfflineAudioContext(1,Math.max(1,Math.ceil((dur+1)*sr)),sr);
+  const sv={ctx,master,OUT,bus:Object.assign({},BUS),snd:S.clickSnd}, out=off.createGain(); out.gain.value=0.9; out.connect(off.destination);
+  ctx=off; master=out; OUT=null; ['click','notes','acc','bell'].forEach(k=>{ BUS[k]=off.createGain(); BUS[k].connect(out); });
+  BUS.click.gain.value=1.15; BUS.notes.gain.value=1.1; BUS.acc.gain.value=1.1*accR;
+  try{ log.forEach(e=>{ if(e.t<0||e.t>dur+0.5) return;
+    if(which==='click'&&e.k==='c'){ S.clickSnd=e.snd; click(e.t,e.kind); }
+    if(which==='notes'&&(e.k==='n'||e.k==='a')) snare(e.t,e.k==='a'); }); }
+  finally{ ctx=sv.ctx; master=sv.master; OUT=sv.OUT; Object.assign(BUS,sv.bus); S.clickSnd=sv.snd; }
+  return off.startRendering();
+}
+// where the camera file sits on the timeline: D = camera-file time minus timeline time (seconds)
+function edPlace(meta,camAudio){
+  const C=meta.cap, ev=(meta.log||[]).map(e=>e.t*1000);
+  if(!C||C.t0==null||!C.L.length) return {D:0,how:'start'};
+  const t0=Math.round(C.t0*1000), L=Float32Array.from(C.L,x=>x||0), R=Float32Array.from(C.R,x=>x||0);
+  // 1. the capture runs a little behind the clock: find by how much using the app's own sounds (left)
+  let lam=lagToTimes(onsetsOf(L),ev.map(t=>t-t0),-100,400); if(lam==null) lam=Math.round(2048/C.sr*1000);
+  if(!camAudio||!C.mic) return {D:0,how:'start',lam};
+  // 2. the mic heard on the clock (right) vs the mic inside the camera file
+  const n=Math.max(0,R.length-lam+t0), mc=new Float32Array(n); for(let T=0;T<n;T++){ const k=T-t0+lam; mc[T]=k>=0&&k<R.length?R[k]:0; }
+  const D=matchShift(onsetsOf(mc),onsetsOf(envOf(camAudio)),3000);
+  return D==null?{D:0,how:'start',lam}:{D:D/1000,how:'mic',lam};
+}
 async function edOpen(base,cam,meta){
-  const hasCam=!!cam;
-  if(ED){ URL.revokeObjectURL(ED.urlB); if(ED.urlC) URL.revokeObjectURL(ED.urlC); }
-  ED={bBlob:base,cBlob:cam,meta,dur:meta.dur,urlB:URL.createObjectURL(base),urlC:cam?URL.createObjectURL(cam):null,
+  const hasCam=!!(cam&&meta.camOn);
+  if(ED){ URL.revokeObjectURL(ED.urlB); if(ED.urlC) URL.revokeObjectURL(ED.urlC); edAudioStop(); }
+  ED={bBlob:base,cBlob:cam,meta,dur:meta.dur,urlB:URL.createObjectURL(base),urlC:hasCam?URL.createObjectURL(cam):null,
     cam:{x:meta.cam?meta.cam.x:0.04,y:meta.cam?meta.cam.y:0.6,w:meta.cam?meta.cam.w:0.33,shape:'rect',frame:true,mirror:true,pulse:false},
     lay:hasCam?'free':'none',hasCam,
     title:{on:!!S.fmTitle,text:S.fmTitle||'',y:relY('fChal')||0.2},handle:{on:!!S.fmHandle,text:S.fmHandle||'',y:relY('fHandle')||0.09},endT:{on:!!S.fmEnd,text:S.fmEnd||''},
-    trim:{a:0,b:meta.dur},tool:hasCam?'cam':'txt',playing:false,drag:null,ptrs:new Map(),raf:0,guide:false};
-  const vb=$('edBase'), vc=$('edCam'); vb.src=ED.urlB; vc.src=ED.urlC||'';
-  if(!ED_SRC){ try{ ED_SRC=ctx.createMediaElementSource(vb); ED_DEST=ctx.createMediaStreamDestination(); ED_PREV=ctx.createGain(); ED_SRC.connect(ED_PREV).connect(ctx.destination); ED_SRC.connect(ED_DEST); }catch(e){} }
+    trim:{a:0,b:meta.dur},tool:hasCam?'cam':'txt',playing:false,drag:null,ptrs:new Map(),raf:0,guide:false,
+    mix:{click:{v:(meta.mix?meta.mix.click:85)/100,m:false},notes:{v:(meta.mix?meta.mix.notes:80)/100,m:false},mic:{v:1,m:false}},
+    D:0,hp:0,micBuf:null,clickBuf:null,notesBuf:null,srcs:[],clk:null,ready:false};
+  const vb=$('edBase'), vc=$('edCam'); vb.src=ED.urlB; vb.muted=true; vc.src=ED.urlC||''; vc.muted=true;
   $('fEd').hidden=false; $('edTools').querySelector('[data-tool="cam"]').disabled=!hasCam;
+  $('edBusy').hidden=false;
   await Promise.all([edReady(vb),hasCam?edReady(vc):null]);
   if(isFinite(vb.duration)&&vb.duration>0){ ED.dur=vb.duration; ED.trim.b=ED.dur; }
-  // phones start the recorded sound a little after the picture: find the clicks in the file and measure by how much
-  ED.abuf=null; ED.mic=null; ED.lag=0; ED.hp=0;
-  try{ const all=await ctx.decodeAudioData(await base.arrayBuffer());
-    // left = the app's sound, right = the microphone (recorded apart so headphone delay can be undone)
-    if(all.numberOfChannels>=2){ const one=ch=>{ const b=ctx.createBuffer(1,all.length,all.sampleRate); b.copyToChannel(all.getChannelData(ch),0); return b; }; ED.abuf=one(0); ED.mic=one(1); ED.hp=S.hpLag||0; }
-    else ED.abuf=all;
-    ED.lag=edLag(ED.abuf,meta.beats,0); }catch(e){ ED.abuf=null; ED.mic=null; }
-  vb.muted=!!ED.abuf;
-  if(S.fmLay&&ED.hasCam){ if(S.fmLay==='none') ED.lay='none'; else edLayout(S.fmLay); }
-  vb.currentTime=0; if(hasCam) vc.currentTime=0;
-  edTool(ED.tool); edLoop();
+  const E=ED;
+  try{
+    const m=meta.mix||{notes:80,acc:100}, accR=m.notes>0?Math.min(2,m.acc/m.notes):1;
+    [E.clickBuf,E.notesBuf]=await Promise.all([edStem(meta.log||[],E.dur,'click',accR),edStem(meta.log||[],E.dur,'notes',accR)]);
+  }catch(e){ E.clickBuf=E.notesBuf=null; }
+  let camAudio=null;
+  if(cam&&meta.micOn){ try{ camAudio=await ctx.decodeAudioData(await cam.arrayBuffer()); }catch(e){ camAudio=null; } }
+  const P=edPlace(meta,camAudio); E.D=P.D; E.how=P.how;
+  if(camAudio){ // the mic, laid on the timeline (mic at timeline T = camera file at T+D)
+    const sr=camAudio.sampleRate, n=Math.ceil((E.dur+1)*sr), mb=ctx.createBuffer(1,n,sr), src=camAudio.getChannelData(0), dst=mb.getChannelData(0), sh=Math.round(E.D*sr);
+    for(let i=0;i<n;i++){ const j=i+sh; if(j>=0&&j<src.length) dst[i]=src[j]; }
+    E.micBuf=mb; E.hp=S.hpLag||0;
+  } else E.mix.mic.m=true;
+  if(ED!==E) return;
+  E.bus={}; ['click','notes','mic'].forEach(k=>{ E.bus[k]=ctx.createGain(); E.bus[k].connect(ctx.destination); }); edMixApply();
+  E.ready=true; $('edBusy').hidden=true;
+  if(S.fmLay&&E.hasCam){ if(S.fmLay==='none') E.lay='none'; else edLayout(S.fmLay); }
+  vb.currentTime=0; if(hasCam) vc.currentTime=edCamT(0);
+  edTool(E.tool); edLoop();
 }
 function edClose(){ if(!ED) return; edPause(); cancelAnimationFrame(ED.raf); $('fEd').hidden=true; }
-/* sound sync */
-// the clicks are at known times (meta.beats); slide them over the sound's loudness until they line up best
-function edLag(buf,beats,shift){
-  const bs=(beats||[]).map(b=>b-(shift||0)).filter(b=>b>=0).slice(0,16); if(bs.length<2) return 0;
-  const d=buf.getChannelData(0), sr=buf.sampleRate, n=Math.floor(d.length/sr*1000), env=new Float32Array(n);
-  for(let i=0;i<n;i++){ let m=0; const a=Math.floor(i*sr/1000), z=Math.min(d.length,a+Math.floor(sr/1000)); for(let k=a;k<z;k++){ const v=Math.abs(d[k]); if(v>m) m=v; } env[i]=m; }
-  const on=new Float32Array(n); for(let i=4;i<n;i++) on[i]=Math.max(0,env[i]-env[i-4]); // rises in loudness = hits
-  let best=0, bl=0;
-  for(let L=-300;L<=1500;L+=2){ let s=0; for(const b of bs){ const c=Math.round(b*1000)+L; let m=0; for(let j=c-4;j<=c+4;j++) if(j>=0&&j<n&&on[j]>m) m=on[j]; s+=m; } if(s>best){ best=s; bl=L; } }
-  return bl/1000;
-}
-function edAudioStop(){ if(!ED) return; [ED.asrc,ED.msrc].forEach(s=>{ if(s) try{ s.stop(); }catch(e){} }); ED.asrc=ED.msrc=null; }
-function edAudioStart(pos,dest){ edAudioStop(); if(!ED.abuf) return;
-  const go=(buf,p)=>{ const s=ctx.createBufferSource(); s.buffer=buf; s.connect(dest); s.start(0,Math.max(0,Math.min(p,buf.duration-0.01))); return s; };
-  ED.asrc=go(ED.abuf,pos); if(ED.mic) ED.msrc=go(ED.mic,pos+ED.hp); } // the mic (and the camera) run ahead by the headphone delay
-const edCamT=t=>t+(ED&&ED.mic?ED.hp:0);
+/* sound */
+// camera and mic move together: both run ahead of the timeline by the headphone delay
+const edCamT=t=>t+(ED?ED.D+(ED.micBuf?ED.hp:0):0);
+const edGain=k=>ED.mix[k].m?0:ED.mix[k].v;
+function edMixApply(){ if(!ED||!ED.bus) return; ['click','notes','mic'].forEach(k=>ED.bus[k].gain.value=edGain(k)); }
+function edAudioStop(){ if(!ED) return; (ED.srcs||[]).forEach(s=>{ try{ s.stop(); }catch(e){} try{ s.disconnect(); }catch(e){} }); ED.srcs=[]; }
+// start every track at timeline position t, at audio time `at`
+function edSrc(c,buf,dest,pos,at){ if(!buf||pos>=buf.duration) return null; const s=c.createBufferSource(); s.buffer=buf; s.connect(dest); if(pos>=0) s.start(at,pos); else s.start(at-pos,0); return s; }
+function edAudioStart(t){ edAudioStop(); if(!ED.bus) return; const at=ctx.currentTime+0.04; ED.clk={at,t};
+  ED.srcs=[edSrc(ctx,ED.clickBuf,ED.bus.click,t,at),edSrc(ctx,ED.notesBuf,ED.bus.notes,t,at),edSrc(ctx,ED.micBuf,ED.bus.mic,t+ED.hp,at)].filter(Boolean); }
+// while playing, the audio clock leads; what is heard comes out a little later, so the picture waits for it
+const edNow=()=>ED.playing&&ED.clk?ED.clk.t+(ctx.currentTime-ED.clk.at)-((ctx.outputLatency||0)+(ctx.baseLatency||0)):$('edBase').currentTime;
+// keep a video on a target time without jumping: small drift is pulled in by speed, large drift by a seek
+function edSlave(v,target,hard){ if(v.readyState<2) return; const d=target-v.currentTime;
+  if(Math.abs(d)>(hard||0.25)){ v.currentTime=Math.max(0,target); v.playbackRate=1; }
+  else v.playbackRate=clamp(1+d*1.6,0.9,1.1); }
 /* geometry */
 function edCamRect(W,H){
   const c=ED.cam, m=ED.meta, ar=m.camW&&m.camH?m.camH/m.camW:4/3;
@@ -112,19 +168,21 @@ function edDraw(g,W,H,t,preview){
 /* preview loop */
 function edLoop(){
   if(!ED||$('fEd').hidden) return;
-  const vb=$('edBase'), vc=$('edCam'), cv=$('edCv'), t=vb.currentTime||0;
-  if(ED.hasCam&&vc.readyState>=2&&Math.abs((vc.currentTime||0)-edCamT(t))>(ED.playing?0.15:0.04)) vc.currentTime=edCamT(t);
-  if(ED.playing&&t>=ED.trim.b-0.03) edPause();
+  const vb=$('edBase'), vc=$('edCam'), cv=$('edCv'), t=edNow();
+  if(ED.playing){ edSlave(vb,t); if(ED.hasCam) edSlave(vc,edCamT(t)); if(t>=ED.trim.b-0.03) edPause(); }
+  else if(ED.hasCam&&vc.readyState>=2&&Math.abs((vc.currentTime||0)-edCamT(t))>0.04) vc.currentTime=edCamT(t);
   edDraw(cv.getContext('2d'),cv.width,cv.height,t,true);
   $('edCur').style.left=(100*clamp(t/ED.dur,0,1))+'%'; $('edPlay').hidden=ED.playing;
   if(ED.tool==='trim') edTrimInfo();
   ED.raf=requestAnimationFrame(edLoop);
 }
-async function edPlayGo(){ const vb=$('edBase'), vc=$('edCam'); await initAudio(); if(ED_PREV) ED_PREV.gain.value=1;
-  if(vb.currentTime<ED.trim.a||vb.currentTime>=ED.trim.b-0.05) vb.currentTime=ED.trim.a;
-  ED.playing=true; try{ await vb.play(); if(ED.hasCam){ vc.currentTime=edCamT(vb.currentTime); await vc.play(); } }catch(e){} if(ED.abuf) edAudioStart(vb.currentTime+ED.lag,ctx.destination); }
-function edPause(){ if(!ED) return; ED.playing=false; $('edBase').pause(); $('edCam').pause(); edAudioStop(); }
-function edSeek(t){ const vb=$('edBase'); vb.currentTime=clamp(t,0,ED.dur); if(ED.hasCam) $('edCam').currentTime=edCamT(vb.currentTime); if(ED.playing&&ED.abuf) edAudioStart(vb.currentTime+ED.lag,ctx.destination); }
+async function edPlayGo(){ if(!ED||!ED.ready) return; const vb=$('edBase'), vc=$('edCam'); await initAudio();
+  let t=vb.currentTime; if(t<ED.trim.a||t>=ED.trim.b-0.05) t=ED.trim.a;
+  vb.currentTime=t; if(ED.hasCam) vc.currentTime=edCamT(t);
+  ED.playing=true; edAudioStart(t);
+  try{ await vb.play(); if(ED.hasCam) await vc.play(); }catch(e){} }
+function edPause(){ if(!ED) return; const t=ED.playing?edNow():null; ED.playing=false; const vb=$('edBase'); vb.pause(); $('edCam').pause(); vb.playbackRate=1; $('edCam').playbackRate=1; if(t!=null) vb.currentTime=clamp(t,0,ED.dur); edAudioStop(); }
+function edSeek(t){ const vb=$('edBase'); t=clamp(t,0,ED.dur); vb.currentTime=t; if(ED.hasCam) $('edCam').currentTime=edCamT(t); if(ED.playing) edAudioStart(t); }
 /* touching the preview: drag the camera or a text, pinch the camera */
 (()=>{ const cv=$('edCv');
   const P=e=>{ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}; };
@@ -161,6 +219,9 @@ function edLayout(k){ ED.lay=k; const c=ED.cam;
   if(k==='bubble') Object.assign(c,{shape:'circle',w:0.42,x:0.29,y:0.30});
   if(k==='corner') Object.assign(c,{shape:'circle',w:0.32,x:0.64,y:0.66});
   edTool('lay'); }
+const ED_MIX=[['click','קליק','♩'],['notes','תווים','🥁'],['mic','מיקרופון','🎤']];
+function edMixRow([k,n,ic]){ const x=ED.mix[k], dis=k==='mic'&&!ED.micBuf, v=Math.round(x.v*100);
+  return `<div class="mxr${x.m?' off':''}${dis?' dis':''}" data-mx="${k}"><span class="mxi">${ic}</span><span class="mxn">${n}</span><input type="range" dir="ltr" min="0" max="150" step="1" value="${v}" data-mxv="${k}" ${dis?'disabled':''}><b class="mxp" dir="ltr">${dis?'—':x.m?'0%':v+'%'}</b><button class="mxm" data-mxm="${k}" ${dis?'disabled':''} aria-label="השתק ${n}">${x.m?'🔇':'🔊'}</button></div>`; }
 function edTool(t,quiet){ ED.tool=t; $('edTools').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===t)));
   $('edHint').hidden=!(t==='cam'&&camVisible()); const P=$('edPanel'), c=ED.cam;
   if(t==='cam') P.innerHTML=!ED.hasCam?'<div class="hint">אין מצלמה בצילום הזה.</div>':`<div class="rw"><span>גודל</span><b id="edSzV">${Math.round(c.w*100)}%</b></div><input type="range" id="edSz" min="18" max="100" value="${Math.round(c.w*100)}">
@@ -174,10 +235,11 @@ function edTool(t,quiet){ ED.tool=t; $('edTools').querySelectorAll('button').for
     <label class="toggle"><input type="checkbox" id="edHOn" ${ED.handle.on?'checked':''}><span><b>שם משתמש</b></span></label><input class="txt" id="edHT" maxlength="30" dir="ltr" value="${esc(ED.handle.text)}">
     <label class="toggle"><input type="checkbox" id="edEOn" ${ED.endT.on?'checked':''}><span><b>הודעת סיום</b></span></label><input class="txt" id="edET" maxlength="70" value="${esc(ED.endT.text)}">
     <div class="hint">גוררים כותרת או שם משתמש על הסרטון כדי להזיז אותם</div>`;
-  if(t==='sync') P.innerHTML=!ED.mic?'<div class="hint">אין מיקרופון נפרד בצילום הזה, אז אין מה לסנכרן.</div>':`<div class="rw"><span>🎧 השהיית אוזניות</span><b id="edHpV" dir="ltr">${Math.round(ED.hp*1000)}ms</b></div>
-    <input type="range" dir="ltr" id="edHp" min="-300" max="300" step="5" value="${Math.round(ED.hp*1000)}">
-    <div class="row" style="justify-content:center;gap:8px"><button class="chip" data-hp="reset">איפוס${S.hpMeas!=null?` (${Math.round(S.hpMeas*1000)}ms)`:''}</button><button class="chip" data-hp="10">+10</button><button class="chip" data-hp="-10">−10</button></div>
-    <div class="hint">מזיזים עד שהצליל של האפליקציה "נדבק" למכות שלך. כדאי לנגן תוך כדי.</div>`;
+  if(t==='mix') P.innerHTML=ED_MIX.map(edMixRow).join('')+`<div class="hint">הקליק והתווים נבנים מחדש בשמירה, נקיים ובלי דיליי.</div>`;
+  if(t==='sync') P.innerHTML=!ED.micBuf?'<div class="hint">אין מיקרופון בצילום הזה, אז אין מה לסנכרן.</div>':`<div class="rw"><span>🎧 השהיית אוזניות</span><b id="edHpV" dir="ltr">${Math.round(ED.hp*1000)}ms</b></div>
+    <input type="range" dir="ltr" id="edHp" min="-300" max="300" step="1" value="${Math.round(ED.hp*1000)}">
+    <div class="row" style="justify-content:center;gap:8px"><button class="chip" data-hp="reset">איפוס${S.hpMeas!=null?` (${Math.round(S.hpMeas*1000)}ms)`:''}</button><button class="chip" data-hp="5">+5</button><button class="chip" data-hp="-5">−5</button></div>
+    <div class="hint">המצלמה והמיקרופון זזים יחד. מזיזים עד שהקליק "נדבק" למכות שלך.${ED.how==='mic'?'':' (לא נמצא המיקום המדויק של קובץ המצלמה, הונח לפי ההתחלה)'}</div>`;
   if(t==='trim') P.innerHTML=`<div class="tcode" dir="ltr"><span id="edTa"></span><span id="edTlen" class="hl"></span><span id="edTb"></span></div>
     <div class="chips sm"><button class="chip" id="edNoCount" ${ED.meta.firstPlay==null?'disabled':''}>✂ בלי הספירה בהתחלה</button><button class="chip" id="edToEnd" ${ED.meta.endAt==null?'disabled':''}>עד סוף הסבב האחרון</button><button class="chip" id="edTrimReset">הכל</button></div>
     <div class="hint">גוררים את הידיות על פס הזמן</div>`;
@@ -186,15 +248,17 @@ function edTool(t,quiet){ ED.tool=t; $('edTools').querySelectorAll('button').for
 function edPanelSync(){ if(ED.tool==='cam'&&$('edSz')){ $('edSz').value=Math.round(ED.cam.w*100); $('edSzV').textContent=Math.round(ED.cam.w*100)+'%'; } }
 function edTrimInfo(){ if(!$('edTa')) return; $('edTa').textContent=fmt(ED.trim.a); $('edTb').textContent=fmt(ED.trim.b); $('edTlen').textContent='אורך '+fmt(ED.trim.b-ED.trim.a); }
 $('edTools').onclick=e=>{ const b=e.target.closest('button'); if(b&&!b.disabled) edTool(b.dataset.tool); };
-const edHpSet=ms=>{ ED.hp=clamp(ms,-300,300)/1000; S.hpLag=ED.hp; save(); const v=$('edHpV'); if(v) v.textContent=Math.round(ED.hp*1000)+'ms'; const r=$('edHp'); if(r) r.value=Math.round(ED.hp*1000); if(ED.playing) edAudioStart($('edBase').currentTime+ED.lag,ctx.destination); if(ED.hasCam) $('edCam').currentTime=edCamT($('edBase').currentTime); };
+const edHpSet=ms=>{ ED.hp=clamp(ms,-300,300)/1000; S.hpLag=ED.hp; save(); const v=$('edHpV'); if(v) v.textContent=Math.round(ED.hp*1000)+'ms'; const r=$('edHp'); if(r) r.value=Math.round(ED.hp*1000); if(ED.playing) edAudioStart(edNow()); else if(ED.hasCam) $('edCam').currentTime=edCamT($('edBase').currentTime); };
 $('edPanel').addEventListener('click',e=>{ const b=e.target.closest('[data-hp]'); if(!b||!ED) return; if(b.dataset.hp==='reset') edHpSet((S.hpMeas||0)*1000); else edHpSet(ED.hp*1000+ +b.dataset.hp); });
 $('edPanel').addEventListener('input',e=>{ const id=e.target.id, v=e.target.value; if(id==='edHp'){ edHpSet(+v); return; }
+  const mk=e.target.dataset.mxv; if(mk){ const x=ED.mix[mk]; x.v=v/100; x.m=false; const row=e.target.closest('.mxr'); row.classList.remove('off'); row.querySelector('.mxp').textContent=v+'%'; row.querySelector('.mxm').textContent='🔊'; edMixApply(); return; }
   if(id==='edSz'){ ED.cam.w=v/100; $('edSzV').textContent=v+'%'; if(ED.lay==='half') ED.lay='free'; }
   if(id==='edTT') ED.title.text=v; if(id==='edHT') ED.handle.text=v; if(id==='edET') ED.endT.text=v; });
 $('edPanel').addEventListener('change',e=>{ const id=e.target.id, c=e.target.checked;
   if(id==='edFrame') ED.cam.frame=c; if(id==='edMirror') ED.cam.mirror=c; if(id==='edPulse') ED.cam.pulse=c;
   if(id==='edTOn') ED.title.on=c; if(id==='edHOn') ED.handle.on=c; if(id==='edEOn') ED.endT.on=c; });
-$('edPanel').addEventListener('click',e=>{ const l=e.target.closest('[data-lay]'), sh=e.target.closest('[data-sh]'), tk=e.target.closest('[data-tk]');
+$('edPanel').addEventListener('click',e=>{ const l=e.target.closest('[data-lay]'), sh=e.target.closest('[data-sh]'), tk=e.target.closest('[data-tk]'), mm=e.target.closest('[data-mxm]');
+  if(mm&&!mm.disabled){ const k=mm.dataset.mxm; ED.mix[k].m=!ED.mix[k].m; edMixApply(); edTool('mix',true); return; }
   if(l&&!l.disabled) edLayout(l.dataset.lay);
   if(sh){ ED.cam.shape=sh.dataset.sh; if(ED.lay==='half'||ED.lay==='none') ED.lay='free'; edTool('lay'); }
   if(tk){ const i=$('edTT'); i.value+=(i.value&&!/\s$/.test(i.value)?' ':'')+tk.dataset.tk; ED.title.text=i.value; }
@@ -203,36 +267,99 @@ $('edPanel').addEventListener('click',e=>{ const l=e.target.closest('[data-lay]'
   if(e.target.id==='edTrimReset'){ ED.trim={a:0,b:ED.dur}; edTrk(); } });
 $('edPlay').onclick=()=>edPlayGo();
 $('edX').onclick=()=>{ edClose(); };
-/* render: play the trimmed part once in real time and record the canvas */
-let EDX=null;
-async function edExport(){
-  if(!ED) return; edPause(); await initAudio();
-  const vb=$('edBase'), vc=$('edCam'), cv=document.createElement('canvas'); cv.width=1080; cv.height=1920; const g=cv.getContext('2d');
-  if(!ED_DEST){ try{ ED_DEST=ctx.createMediaStreamDestination(); }catch(e){} }
-  const tracks=[...cv.captureStream(30).getVideoTracks(),...(ED_DEST?ED_DEST.stream.getAudioTracks():[])];
-  const mt=pickType(REC_TYPES); let rec; try{ rec=new MediaRecorder(new MediaStream(tracks),mt?{mimeType:mt,videoBitsPerSecond:8e6}:{videoBitsPerSecond:8e6}); }catch(e){ toast('לא הצלחתי לייצר את הסרטון'); return; }
-  const chunks=[]; EDX={rec,cancel:false}; $('edExp').hidden=false; $('edPct').textContent='0%'; $('edRing').style.setProperty('--p',0);
-  rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
-  rec.onstop=()=>{ const x=EDX; EDX=null; $('edExp').hidden=true; if(ED_PREV) ED_PREV.gain.value=1; vb.pause(); vc.pause(); if(!x||x.cancel) return;
-    edAudioStop();
-    const blob=new Blob(chunks,{type:(rec.mimeType||mt||'video/webm').split(';')[0]});
-    // check the new file too: the recorder may delay the sound again; remember the correction for next time
-    if(x.R!=null&&ED.abuf) blob.arrayBuffer().then(a=>ctx.decodeAudioData(a)).then(b=>{ const e=edLag(b,ED.meta.beats,ED.trim.a); if(Math.abs(e)<1.2){ S.recLag=+(x.R+e).toFixed(3); save(); } }).catch(()=>{}); if(FILM.url) URL.revokeObjectURL(FILM.url); FILM.blob=blob; FILM.url=URL.createObjectURL(blob);
-    edClose(); $('fResVid').src=FILM.url; $('fResHint').textContent=''; $('fRes').hidden=false; };
-  if(ED_PREV) ED_PREV.gain.value=0;
-  vb.currentTime=ED.trim.a; if(ED.hasCam) vc.currentTime=edCamT(ED.trim.a);
-  await new Promise(r=>{ vb.addEventListener('seeked',r,{once:true}); setTimeout(r,800); });
-  const R=(S.recLag!=null?S.recLag:ED.lag); EDX.R=R;
-  try{ await vb.play(); if(ED.hasCam) await vc.play(); }catch(e){}
-  rec.start(500); if(ED.abuf&&ED_DEST) edAudioStart(vb.currentTime+ED.lag+R,ED_DEST); const len=ED.trim.b-ED.trim.a;
-  const tick=()=>{ if(!EDX) return; const t=vb.currentTime, f=clamp((t-ED.trim.a)/len,0,1);
-    if(ED.hasCam&&Math.abs(vc.currentTime-edCamT(t))>0.15) vc.currentTime=edCamT(t);
-    edDraw(g,1080,1920,t,false);
-    $('edPct').textContent=Math.round(f*100)+'%'; $('edRing').style.setProperty('--p',f); $('edLeft').textContent=`עוד כ־${Math.max(1,Math.ceil(len-(t-ED.trim.a)))} שניות`;
-    if(t>=ED.trim.b-0.02||vb.ended){ try{ rec.stop(); }catch(e){} return; }
-    requestAnimationFrame(tick); };
-  tick();
+/* saving: pick which files; they all start and end at the same moment */
+const ED_OUT=[['full','סרטון מלא','🎬','הסרטון עם הפריסה, הטקסטים והמיקס'],['cam','מצלמה','🎥','וידאו + מיקרופון, בלי עריכה'],['notes','מסך תווים','🎼','רק התווים, בלי מצלמה וטקסט'],['app','צליל אפליקציה','♩','קליק + תווים · WAV'],['mic','מיקרופון','🎤','רק המיקרופון · WAV']];
+function edOutOk(k){ return k==='cam'?ED.hasCam:k==='mic'?!!ED.micBuf:true; }
+function edSaveOpen(){ if(!ED||!ED.ready) return; edPause();
+  if(!S.edOut) S.edOut={full:true};
+  $('edOutList').innerHTML=ED_OUT.map(([k,n,ic,h])=>{ const ok=edOutOk(k); return `<label class="toggle eo${ok?'':' dis'}"><input type="checkbox" data-eo="${k}" ${ok&&S.edOut[k]?'checked':''} ${ok?'':'disabled'}><span class="cic">${ic}</span><span><b>${n}</b><small>${ok?h:'אין בצילום הזה'}</small></span></label>`; }).join('');
+  edOutCount(); $('edOut').hidden=false; }
+function edOutCount(){ const n=[...$('edOutList').querySelectorAll('input:checked')].length; $('edOutGo').disabled=!n; $('edOutGo').textContent=n>1?`שמור ${n} קבצים`:'שמור'; }
+$('edOutList').addEventListener('change',e=>{ const k=e.target.dataset.eo; if(!k) return; S.edOut[k]=e.target.checked; save(); edOutCount(); });
+$('edOutX').onclick=()=>{ $('edOut').hidden=true; };
+$('edOutGo').onclick=()=>{ const o={}; ED_OUT.forEach(([k])=>o[k]=!!(S.edOut[k]&&edOutOk(k))); $('edOut').hidden=true; edExport(o); };
+// the timeline from `from` for `len` seconds, mixed with the given levels, as one mono track
+async function edMix(from,len,g){
+  const sr=ctx.sampleRate, off=new OfflineAudioContext(1,Math.max(1,Math.ceil(len*sr)),sr);
+  const put=(buf,pos,v)=>{ if(!v||!buf) return; const gn=off.createGain(); gn.gain.value=v; gn.connect(off.destination); edSrc(off,buf,gn,pos,0); };
+  put(ED.clickBuf,from,g.click); put(ED.notesBuf,from,g.notes); put(ED.micBuf,from+ED.hp,g.mic);
+  return off.startRendering();
 }
-$('edSave').onclick=edExport;
-const edCancel=()=>{ if(EDX){ EDX.cancel=true; try{ EDX.rec.stop(); }catch(e){} } };
+function wavBlob(buf){ const d=buf.getChannelData(0), n=d.length, sr=buf.sampleRate, ab=new ArrayBuffer(44+n*2), v=new DataView(ab);
+  const w=(o,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(o+i,s.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){ const x=d[i]>1?1:d[i]<-1?-1:d[i]; v.setInt16(44+i*2,x<0?x*32768:x*32767,true); }
+  return new Blob([ab],{type:'audio/wav'}); }
+// video files are made by playing the trimmed part once in real time, driven by the audio clock:
+// content time c = a + (audio time - A). every video starts recording on the same tick, so they share one start
+let EDX=null;
+async function edExport(o){
+  if(!ED) return; edPause(); await initAudio();
+  const a=ED.trim.a, b=ED.trim.b, len=b-a, vids=o.full||o.cam||o.notes, out=[], stamp=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-'), nm=(s,x)=>`chartready-${stamp}-${s}.${x}`;
+  EDX={cancel:false,recs:[]}; $('edExp').hidden=false; $('edPct').textContent='0%'; $('edRing').style.setProperty('--p',0); $('edLeft').textContent='רגע…';
+  let st=0, ex=S.exLag!=null?S.exLag:0;
+  if(vids){
+    const vb=$('edBase'), vc=$('edCam'), R=ex, P=0.15, outs=[];
+    const mk=(w,h,buf,key,video)=>{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const tr=[...cv.captureStream(30).getVideoTracks()]; let dest=null;
+      if(buf){ dest=ctx.createMediaStreamDestination(); tr.push(...dest.stream.getAudioTracks()); }
+      const mt=pickType(buf?REC_TYPES:CAM_TYPES), r=new MediaRecorder(new MediaStream(tr),mt?{mimeType:mt,videoBitsPerSecond:8e6,audioBitsPerSecond:192000}:{videoBitsPerSecond:8e6});
+      const x={cv,g:cv.getContext('2d'),dest,buf,key,video,rec:r,mt,chunks:[]}; r.ondataavailable=e=>{ if(e.data&&e.data.size) x.chunks.push(e.data); }; outs.push(x); return x; };
+    let fullBuf=null, micOnly=null;
+    try{
+      if(o.full) fullBuf=await edMix(a-P,len+P,{click:edGain('click'),notes:edGain('notes'),mic:edGain('mic')});
+      if(o.cam&&ED.micBuf) micOnly=await edMix(a-P,len+P,{click:0,notes:0,mic:1});
+      if(o.full) mk(1080,1920,fullBuf,'full',(g,t)=>edDraw(g,1080,1920,t,false));
+      if(o.cam){ const W=vc.videoWidth||720, H=vc.videoHeight||960; mk(W,H,micOnly,'camera',g=>{ g.save(); if(ED.cam.mirror){ g.translate(W,0); g.scale(-1,1); } g.drawImage(vc,0,0,W,H); g.restore(); }); }
+      if(o.notes) mk(1080,1920,null,'notes',g=>{ g.fillStyle='#0b0c0e'; g.fillRect(0,0,1080,1920); if(vb.videoWidth) g.drawImage(vb,0,0,1080,1920); });
+    }catch(e){ EDX=null; $('edExp').hidden=true; toast('לא הצלחתי לייצר את הסרטון'); return; }
+    EDX.recs=outs.map(x=>x.rec);
+    vb.currentTime=Math.max(0,a-P); if(ED.hasCam) vc.currentTime=Math.max(0,edCamT(a-P));
+    await new Promise(r=>{ vb.addEventListener('seeked',r,{once:true}); setTimeout(r,800); });
+    const A=ctx.currentTime+P+0.25, srcs=outs.filter(x=>x.buf).map(x=>edSrc(ctx,x.buf,x.dest,0,A-P));
+    try{ vb.playbackRate=1; await vb.play(); if(ED.hasCam){ vc.playbackRate=1; await vc.play(); } }catch(e){}
+    const c=()=>a+(ctx.currentTime-A);
+    const draw=()=>{ const t=c()-R; edSlave(vb,t,0.3); if(ED.hasCam) edSlave(vc,edCamT(t),0.3); outs.forEach(x=>x.video(x.g,t)); };
+    // start every recorder on the same tick, a moment before content time a
+    await new Promise(res=>{ const w=()=>{ if(ctx.currentTime>=A-0.03||EDX.cancel) return res(); draw(); requestAnimationFrame(w); }; w(); });
+    draw(); outs.forEach(x=>x.rec.start(500)); st=ctx.currentTime-A;
+    await new Promise(res=>{ const tick=()=>{ if(!EDX||EDX.cancel) return res();
+      const f=clamp((c()-a)/len,0,1); draw(); $('edPct').textContent=Math.round(f*100)+'%'; $('edRing').style.setProperty('--p',f); $('edLeft').textContent=`עוד כ־${Math.max(1,Math.ceil(b-c()))} שניות`;
+      if(c()>=b) return res(); requestAnimationFrame(tick); }; tick(); });
+    const stops=outs.map(x=>new Promise(r=>{ x.rec.onstop=r; try{ x.rec.state!=='inactive'?x.rec.stop():r(); }catch(e){ r(); } }));
+    await Promise.all(stops); srcs.forEach(s=>{ try{ s.stop(); }catch(e){} }); vb.pause(); vc.pause(); vb.playbackRate=1; vc.playbackRate=1;
+    if(!EDX||EDX.cancel){ EDX=null; $('edExp').hidden=true; return; }
+    for(const x of outs){ const ty=(x.rec.mimeType||x.mt||'video/webm').split(';')[0]; out.push({key:x.key,blob:new Blob(x.chunks,{type:ty}),name:nm(x.key,ty.includes('mp4')?'mp4':'webm')}); }
+    // where did the recorder really put the sound? compare the file's sound with the sound that was fed in.
+    // used now for the WAVs, and next time to draw the picture in step with it
+    const F=out.find(x=>x.key==='full')||out.find(x=>x.key==='camera'&&micOnly);
+    if(F){ try{ const got=await ctx.decodeAudioData(await F.blob.arrayBuffer()), g=F.key==='full'?{click:edGain('click'),notes:edGain('notes'),mic:edGain('mic')}:{click:0,notes:0,mic:1};
+      const want=await edMix(a+st,Math.min(len,20),g), L=matchShift(onsetsOf(envOf(want)),onsetsOf(envOf(got)),600);
+      if(L!=null){ ex=L/1000; S.exLag=+ex.toFixed(3); save(); } }catch(e){} }
+  }
+  ED.lastExport={st,ex,R0:S.exLag};
+  // the WAVs start exactly where the videos' sound starts
+  try{ const from=a+st-ex, L2=b-from;
+    if(o.app) out.push({key:'app',blob:wavBlob(await edMix(from,L2,{click:1,notes:1,mic:0})),name:nm('app','wav')});
+    if(o.mic&&ED.micBuf) out.push({key:'mic',blob:wavBlob(await edMix(from,L2,{click:0,notes:0,mic:1})),name:nm('mic','wav')});
+  }catch(e){ toast('לא הצלחתי לייצר את קובצי הצליל'); }
+  EDX=null; $('edExp').hidden=true;
+  if(!out.length) return;
+  edClose(); edResults(out);
+}
+const ED_OUTN={full:'סרטון מלא',camera:'מצלמה',notes:'מסך תווים',app:'צליל אפליקציה',mic:'מיקרופון'};
+function edResults(out){
+  if(FILM.url) URL.revokeObjectURL(FILM.url); FILM.out=out;
+  const v=out.find(x=>x.key==='full')||out.find(x=>x.key!=='app'&&x.key!=='mic');
+  FILM.blob=v?v.blob:null; FILM.url=v?URL.createObjectURL(v.blob):null;
+  $('fResVid').hidden=!v; if(v) $('fResVid').src=FILM.url; else $('fResVid').removeAttribute('src');
+  const kb=n=>n>1048576?(n/1048576).toFixed(1)+'MB':Math.max(1,Math.round(n/1024))+'KB';
+  $('fResList').innerHTML=out.length>1?out.map((x,i)=>`<button class="frf" data-fi="${i}"><b>${ED_OUTN[x.key]||x.key}</b><small dir="ltr">${x.name.split('.').pop().toUpperCase()} · ${kb(x.blob.size)}</small><span>⬇</span></button>`).join(''):'';
+  $('fSave').textContent=out.length>1?'שמור הכל':'שמור / שתף';
+  $('fResHint').textContent=out.length>1?'כל הקבצים מתחילים ונגמרים באותו רגע, אז אפשר לשים אותם זה על זה בעורך.':'';
+  $('fRes').hidden=false;
+}
+$('fResList').addEventListener('click',e=>{ const b=e.target.closest('[data-fi]'); if(b&&FILM.out) filmShareAll([FILM.out[+b.dataset.fi]]); });
+$('edSave').onclick=edSaveOpen;
+const edCancel=()=>{ if(EDX){ EDX.cancel=true; } };
 $('edExpX').onclick=edCancel; $('edExpCancel').onclick=edCancel;

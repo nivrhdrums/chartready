@@ -5,6 +5,7 @@ D="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p /tmp/claude-0/build /home/claude/chartready-site /home/claude/cr-server/public
 cp -r "$D/build/." /tmp/claude-0/build/
 cp "$D/site/"* /home/claude/chartready-site/
+cp "$D/site/"* /home/claude/cr-server/public/   # build.py also writes the server copy of sw.js
 cp "$D/cr-server/"* /home/claude/cr-server/ 2>/dev/null || true
 cp "$D/cr-server/.env.example" /home/claude/cr-server/ 2>/dev/null || true
 cp "$D/tools/rhythm-map.html" /home/claude/ 2>/dev/null || true

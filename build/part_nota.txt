@@ -137,7 +137,7 @@ function tupletsPossible(){
 }
 function svgBar(bar,bi,r,width,opt){
   const nt=layoutBar(bar,r,opt), H=S.showCount?100:80;
-  const stick=!!(S.dynOn&&S.stick), CY=stick?L+43:L+32;
+  const stick=!!(S.stick), CY=stick?L+43:L+32;
   const kx=(width-PADL-10)/(nt.width-PADL-10), X=x=>PADL+(x-PADL)*kx;
   // inside a tuplet a flagged note before a longer one (8th then quarter) pushes the next note right so the flag never touches it
   const TXS=new Map();
@@ -206,8 +206,8 @@ function svgBar(bar,bi,r,width,opt){
       for(let i=0;i<G;i++) put(g,g.start+i*g.len/G);
     });
   }
-  if((bar.acc&&bar.acc.length)||(S.dynOn&&S.stick)){
-    const acc=new Set(bar.acc||[]), hm=S.dynOn&&S.stick?stickMap(bar,r.den):null;
+  if((bar.acc&&bar.acc.length)||(S.stick)){
+    const acc=new Set(bar.acc||[]), hm=S.stick?stickMap(bar,r.den):null;
     nt.toks.forEach(t=>{ if(t.kind!=='note'||t.tied) return; const k=Math.round(t.tick), cx=tx(t)+HW/2;
       if(acc.has(k)){ const ax=t.dur>=48?cx:sx(t), ay=STEMTOP-8; s+=`<path class="accent" d="M${(ax-5.5).toFixed(1)} ${ay-4} L${(ax+5.5).toFixed(1)} ${ay} L${(ax-5.5).toFixed(1)} ${ay+4}"/>`; }
       if(hm&&hm.has(k)) s+=`<text class="stk${hm.get(k)==='L'?' l':''}" x="${cx.toFixed(1)}" y="${L+31}">${hm.get(k)}</text>`; });

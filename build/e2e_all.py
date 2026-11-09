@@ -15,7 +15,7 @@ async def main():
                 await pg.evaluate(f"[...document.querySelectorAll('[data-pop=\"{k}\"]')].find(e=>e.offsetParent).click()"); await pg.wait_for_timeout(350); await shot(f'{tab}:{k}')
                 await pg.evaluate("document.getElementById('popClose').click()"); await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         await shot('gen'); await pops('gen')
-        await pg.click('#dynTile'); await pg.wait_for_timeout(200); await shot('dyn toggled')
+        await pg.click('#dynTile'); await pg.wait_for_timeout(300); await shot('dyn popup'); await pg.evaluate("document.getElementById('dynOn').click()"); await pg.click('#popClose'); await pg.wait_for_timeout(200); await shot('dyn on')
         await pg.click('#play'); await pg.wait_for_timeout(2500); await shot('playing'); await pg.click('#play'); await pg.wait_for_timeout(300)
         for t in ['tabMet','tabTr']:
             await pg.click('#'+t); await pg.wait_for_timeout(400); await shot(t); await pops(t)

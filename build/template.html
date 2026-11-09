@@ -130,6 +130,10 @@ header{position:relative;display:flex;flex-direction:column;align-items:center;l
 .dial .face{position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle at 50% 30%,#2e3440,#161a21);box-shadow:inset 0 0 0 2px var(--accent-soft)}
 .dial .arr{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:transparent;color:var(--muted);font:600 26px var(--f-num);cursor:pointer;z-index:2}
 .dial .arr.l{left:18%}.dial .arr.r{right:18%}
+.darr{position:absolute;top:68%;width:15%;height:22%;transform:translate(-50%,-50%);border:0;background:transparent;color:var(--muted);padding:0;cursor:pointer;z-index:3;display:grid;place-items:center;-webkit-tap-highlight-color:transparent;touch-action:none;border-radius:50%}
+.darr.l{left:24%}.darr.r{left:76%}
+.darr svg{width:38%;height:auto;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:transform .08s}
+.darr:active,.darr.hold{color:var(--accent)}.darr:active svg{transform:scale(.88)}
 .dplay{position:absolute;inset:34%;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;z-index:2;box-shadow:0 6px 24px -6px var(--accent)}
 .dplay svg{width:42%;height:42%}
 .mrow{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -413,6 +417,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
       <div class="dial" id="dial" aria-label="גלגל טמפו" dir="ltr">
         <svg class="ticks" id="dialTicks" viewBox="0 0 100 100"></svg>
         <div class="dc"><b id="mBpm" role="button" tabindex="0" aria-label="הקלד טמפו">80</b><i id="mName">ANDANTE</i></div>
+        <button class="darr l" id="dArrL" aria-label="הורד טמפו"><svg viewBox="0 0 12 20"><path d="M9 2L2 10l7 8"/></svg></button>
+        <button class="darr r" id="dArrR" aria-label="העלה טמפו"><svg viewBox="0 0 12 20"><path d="M3 2l7 8-7 8"/></svg></button>
       </div>
       <span class="msong" id="mSong" hidden></span>
     </div>
@@ -430,13 +436,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 
   <div class="deck" id="deck">
     <div class="tiles" id="quickGen">
-      <button class="tile" data-pop="meter" data-drag="meter"><small>משקל</small><span class="viz" id="vMeter"></span><b id="qMeter"></b></button>
-      <button class="tile" data-pop="bars" data-drag="bars"><small>תיבות</small><span class="viz" id="vBars"></span><b id="qBars">4</b></button>
-      <button class="tile" data-pop="level" data-drag="level"><small>מורכבות</small><span class="viz" id="vLevel"></span><b id="qLevel">5</b></button>
-      <button class="tile" id="dynTile"><small>דינמיקה</small><span class="viz" id="vDyn"></span><b id="qDyn">כבוי</b></button>
+      <button class="tile" data-pop="meter"><small>משקל</small><span class="viz" id="vMeter"></span><b id="qMeter"></b></button>
+      <button class="tile" data-pop="bars"><small>תיבות</small><span class="viz" id="vBars"></span><b id="qBars">4</b></button>
+      <button class="tile" data-pop="level"><small>מורכבות</small><span class="viz" id="vLevel"></span><b id="qLevel">5</b></button>
+      <button class="tile" id="dynTile" data-pop="dyn"><small>דינמיקה</small><span class="viz" id="vDyn"></span><b id="qDyn">כבוי</b></button>
     </div>
     <div class="tiles" id="quickMet" hidden>
-      <button class="tile" data-pop="mbeats" data-drag="mbeats"><small>משקל</small><span class="viz" id="vMBeats"></span><b id="mMeterBtn"></b></button>
+      <button class="tile" data-pop="mbeats"><small>משקל</small><span class="viz" id="vMBeats"></span><b id="mMeterBtn"></b></button>
       <button class="tile" data-pop="msub"><small>חלוקה</small><span class="viz" id="vMSub"></span><b id="qMSub"></b></button>
       <button class="tile" id="gapBtn" data-pop="gap"><small>הפסקות</small><span class="viz" id="vGap"></span><b id="qGap"></b></button>
       <button class="tile" data-pop="sound"><small>צליל</small><span class="viz" id="vSnd"></span><b id="qSnd"></b></button>
@@ -509,16 +515,17 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   </div>
   <div class="fbar"><div class="fctl" id="fCtl"><button class="chip" id="fExit">יציאה</button><button class="done" id="fGo">▶ התחל</button></div><button class="fstop" id="fStop" hidden aria-label="עצור"><i></i></button></div>
   <div class="fhint" id="fHint" hidden>לעצירה: נגיעה בשתי אצבעות או לחיצה ארוכה</div>
-  <div class="fres" id="fRes" hidden><video id="fResVid" controls playsinline></video><div class="row" style="justify-content:center"><button class="done" id="fSave">שמור / שתף</button><button class="chip" id="fResClose">סגור</button></div><div class="hint" id="fResHint" style="text-align:center"></div></div>
+  <div class="fres" id="fRes" hidden><video id="fResVid" controls playsinline></video><div class="frlist" id="fResList"></div><div class="row" style="justify-content:center"><button class="done" id="fSave">שמור / שתף</button><button class="chip" id="fResClose">סגור</button></div><div class="hint" id="fResHint" style="text-align:center"></div></div>
 </div>
 <div class="fed" id="fEd" dir="rtl" hidden>
   <div class="fedh"><button class="done" id="edSave">שמור ✓</button><b id="edTitle">עריכה</b><button class="xbtn" id="edX" aria-label="סגור">✕</button></div>
-  <div class="fedstage" id="edStage"><canvas id="edCv" width="540" height="960"></canvas><div class="edhint" id="edHint">גרור · צבוט לשינוי גודל</div><button class="edplay" id="edPlay" aria-label="נגן">▶</button></div>
+  <div class="fedstage" id="edStage"><canvas id="edCv" width="540" height="960"></canvas><div class="edhint" id="edHint">גרור · צבוט לשינוי גודל</div><button class="edplay" id="edPlay" aria-label="נגן">▶</button><div class="edbusy" id="edBusy" hidden><i></i>מכין את הצליל…</div></div>
   <div class="edtl" id="edTl" dir="ltr"><div class="edtrk" id="edTrk"></div><i class="edcur" id="edCur"></i></div>
   <div class="edpanel" id="edPanel"></div>
-  <div class="edtools" id="edTools"><button data-tool="cam" aria-pressed="true"><span>🎥</span><small>מצלמה</small></button><button data-tool="lay"><span>▦</span><small>פריסה</small></button><button data-tool="txt"><span>Aa</span><small>טקסט</small></button><button data-tool="trim"><span>✂</span><small>חיתוך</small></button><button data-tool="sync"><span>🎧</span><small>סנכרון</small></button></div>
+  <div class="edtools" id="edTools"><button data-tool="cam" aria-pressed="true"><span>🎥</span><small>מצלמה</small></button><button data-tool="lay"><span>▦</span><small>פריסה</small></button><button data-tool="txt"><span>Aa</span><small>טקסט</small></button><button data-tool="trim"><span>✂</span><small>חיתוך</small></button><button data-tool="mix"><span>🎚</span><small>מיקס</small></button><button data-tool="sync"><span>🎧</span><small>סנכרון</small></button></div>
   <video id="edBase" playsinline hidden></video><video id="edCam" playsinline muted hidden></video>
-  <div class="edexp" id="edExp" hidden><div class="fedh"><span></span><b>מייצר סרטון</b><button class="xbtn" id="edExpX" aria-label="ביטול">✕</button></div><div class="cal"><div class="ring" id="edRing"><div id="edPct">0%</div></div><div class="bg2" id="edLeft">רגע…</div><div class="mut">משאירים את המסך פתוח. הסרטון נשמר עם הפריסה החדשה</div></div><button class="chip" id="edExpCancel" style="height:50px;justify-content:center">ביטול</button></div>
+  <div class="edout" id="edOut" hidden><div class="eocard"><div class="fedh"><span></span><b>מה לשמור?</b><button class="xbtn" id="edOutX" aria-label="סגור">✕</button></div><div class="eolist" id="edOutList"></div><div class="hint">כל הקבצים מתחילים ונגמרים באותו רגע. הקבצים הנפרדים יוצאים בעוצמה מלאה, בלי המיקס.</div><button class="done" id="edOutGo">שמור</button></div></div>
+  <div class="edexp" id="edExp" hidden><div class="fedh"><span></span><b>מייצר סרטון</b><button class="xbtn" id="edExpX" aria-label="ביטול">✕</button></div><div class="cal"><div class="ring" id="edRing"><div id="edPct">0%</div></div><div class="bg2" id="edLeft">רגע…</div><div class="mut">משאירים את המסך פתוח. הקבצים נוצרים בזמן אמת</div></div><button class="chip" id="edExpCancel" style="height:50px;justify-content:center">ביטול</button></div>
 </div>
 
 <div class="sheet" id="sheet" dir="rtl" aria-hidden="true">
@@ -544,6 +551,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
     <section class="sec" data-st="view" hidden>
       <label class="toggle"><input type="checkbox" id="showCount"><span class="cic" dir="ltr">1 e &amp;</span><span><b>ספירה מתחת לתווים</b></span></label>
       <div class="field"><div class="label">ספירת סקסטולות</div><div class="chips" id="sextCount"></div></div>
+      <label class="toggle"><input type="checkbox" id="stickOn"><span class="cic" dir="ltr">R L</span><span><b>סטיקינג מתחת לתווים</b><small>סינגלים לפי החלוקה, רבעים תמיד R</small></span></label>
     </section>
     <section class="sec" data-st="about" hidden>
       <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה {{VER}}</div></div>
@@ -666,12 +674,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
       <div class="field" id="fDyn">
         <label class="toggle"><input type="checkbox" id="dynOn"><span><b>תרגול דינמיקה (אקצנטים)</b></span></label>
         <div id="dynBody" class="field">
-          <label class="toggle"><input type="checkbox" id="stickOn"><span><b>הצג סטיקינג (R / L)</b></span></label>
           <label class="toggle"><input type="checkbox" id="dynAuto"><span><b>השלב עולה עם המורכבות</b></span></label>
           <div class="field" id="dynPick"><div class="label">שלב אקצנטים: <b id="dynOut" style="color:var(--accent)">1</b> · <span id="dynName"></span></div><div class="dsteps" id="dynSteps"></div></div>
           <div class="field"><div class="label">מקסימום דגשים ברצף</div><div class="dsteps d8" id="dynMax"></div></div>
-          <div class="hint">סטיקינג: סינגלים לפי הערך הקטן ביותר בכל פעמה. בטריולה היד הבאה עוברת לפעמה הבאה, ורבעים תמיד ביד ימין.</div>
-        </div>
+                  </div>
       </div>
       <div class="field plist" id="fHistory">
         <div class="songs" id="histList"></div>
@@ -3205,18 +3211,37 @@ function sched(){
     cur.idx++;
     if(e.type==='click'){
       const silent=cur.kind==='beat'?e.muted:!S.clickOn;
-      if(!silent) click(t,e.kind);
+      if(!silent){ SCHED=true; click(t,e.kind); SCHED=false; recLog('c',t,e.kind); }
       if(FILM.recOn&&e.kind!=='sub'&&cur.kind==='gen') filmMark('beat',t);
       if(e.count) visQ.push({t,fn:()=>{$('liveMain').textContent=`ספירה ${e.count}`;$('liveSub').textContent=`\u2066${S.bpm} BPM\u2069`;}});
       if(e.count&&FILM.run){ const k=cur.len-e.count+1; visQ.push({t,fn:()=>filmCount(k)}); }
     } else {
-      if(S.noteSound) snare(t,e.acc);
+      if(S.noteSound){ SCHED=true; snare(t,e.acc); SCHED=false; recLog(e.acc?'a':'n',t); }
       const id=e.id, off=t+Math.min(0.16,e.dur*cur.bd*0.9);
       if(cur.kind==='gen'&&tapOnNow()){ const bi=Math.floor(e.b/cur.r.num+1e-9), bl=cur.r.num*cur.bd; tapExpect(t,id,cur.start.toFixed(3)+'_'+bi,cur.start+bi*bl,cur.start+(bi+1)*bl); }
       visQ.push({t,fn:()=>{const el=$(id); if(el) el.classList.add('on'); const c=$('c'+id); if(c) c.classList.add('now');}});
       visQ.push({t:off,fn:()=>{const el=$(id); if(el) el.classList.remove('on'); const c=$('c'+id); if(c) c.classList.remove('now');}});
     }
   }
+}
+// tempo changed while playing: take back what is already queued and continue in the new tempo from the next click.
+// the click that just sounded stays the anchor, so the very next gap is already in the new tempo
+function retime(oldBpm){
+  if(!playing||!cur||!ctx||cur.kind==='end'||S.tab==='tr'||(FILM&&FILM.run)) return;
+  const C=cur, ob=C.bd, nb=60/S.bpm; if(Math.abs(ob-nb)<1e-9) return;
+  const now=ctx.currentTime, eps=0.004, old=C.start;
+  TRK=TRK.filter(x=>{ if(x.t>now+eps){ try{ x.n.stop(0); }catch(e){} try{ x.n.disconnect(); }catch(e){} return false; } return x.t>now-2; });
+  let pLast=null; for(const e of C.ev){ if(e.type!=='click') continue; if(old+e.b*ob<=now+eps) pLast=e.b; else break; }
+  if(pLast==null) pLast=Math.min(0,Math.floor((now-old)/ob+1e-9));
+  let ns=old+pLast*ob-pLast*nb;
+  let i=C.ev.findIndex(e=>old+e.b*ob>now+eps); if(i<0) i=C.ev.length;
+  const nextB=i<C.ev.length?C.ev[i].b:C.len; const tn=ns+nextB*nb; if(tn<now+0.03) ns+=now+0.03-tn;
+  const map=t=>t>now+eps?ns+(t-old)/ob*nb:t;
+  visQ.forEach(v=>{ v.t=map(v.t); });
+  TAP.exp.forEach(e=>{ e.t=map(e.t); }); TAP.bars.forEach(b=>{ b.start=map(b.start); b.end=map(b.end); });
+  C.start=ns; C.bd=nb; C.idx=i;
+  if(REC.on) REC.log=REC.log.filter(x=>x.t<=now+eps-REC.t0);
+  sched();
 }
 let lastTick=0;
 function frame(){
@@ -3227,6 +3252,7 @@ function frame(){
   if(now-lastTick>0.2){ lastTick=now; trTick(); }
   if(tapOnNow()) tapSweep();
   if(FILM.run) filmProg();
+  if(TRK.length>300) TRK=TRK.filter(x=>x.t>now-1);
   if(playing) requestAnimationFrame(frame);
 }
 const PLAY='<path d="M8 5.5v13l11-6.5z" fill="currentColor"/>', STOP='<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/>';
@@ -3341,30 +3367,20 @@ function rulerDraw(){ const el=$('rulerTks'); if(!el||!el.offsetParent) return; 
   const up=e=>{ if(!st) return; const m=st.moved; st=null; if(!m) openPop('tempo'); };
   r.addEventListener('pointerup',up); r.addEventListener('pointercancel',()=>{st=null;});
   window.addEventListener('resize',rulerDraw); })();
-/* tiles: tap opens the popup, sideways drag changes the value */
-let dragEat=false;
-document.addEventListener('click',e=>{ if(dragEat){ dragEat=false; e.stopPropagation(); e.preventDefault(); } },true);
-const TDRAG={meter:{get:()=>S.num,set:v=>{S.num=clamp(v,1,19); meterSync(); regen();},step:28},bars:{get:()=>S.bars,set:v=>{S.bars=clamp(v,1,32); barsSync(); regen();},step:28},
-  level:{get:()=>S.level,set:v=>lvlSet(v),step:24},mbeats:{get:()=>S.mBeats,set:v=>setMBeats(v),step:28}};
-document.querySelectorAll('.tile[data-drag]').forEach(t=>{ let st=null; const D=TDRAG[t.dataset.drag];
-  t.addEventListener('pointerdown',e=>{ if(isPlaying()) return; st={x:e.clientX,y:e.clientY,v:D.get(),on:false}; });
-  t.addEventListener('pointermove',e=>{ if(!st) return; const dx=e.clientX-st.x;
-    if(!st.on){ if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(e.clientY-st.y)){ st.on=true; t.setPointerCapture(e.pointerId); t.classList.add('drag'); } else return; }
-    const v=st.v+Math.round(-dx/D.step); if(v!==D.get()){ D.set(v); save(); updateQuick(); uiTick(); } });
-  const end=()=>{ if(st&&st.on){ dragEat=true; setTimeout(()=>dragEat=false,350); } st=null; t.classList.remove('drag'); };
-  t.addEventListener('pointerup',end); t.addEventListener('pointercancel',end); });
-/* dynamics tile: a quick tap turns it on/off, a long press opens the popup */
-(()=>{ const t=$('dynTile'); let lp=null, long=false;
-  t.addEventListener('pointerdown',()=>{ if(isPlaying()) return; long=false; lp=setTimeout(()=>{ long=true; openPop('dyn'); },480); });
-  const cl=()=>clearTimeout(lp); t.addEventListener('pointerleave',cl); t.addEventListener('pointercancel',cl);
-  t.addEventListener('pointerup',()=>{ cl(); });
-  t.addEventListener('click',()=>{ if(long||isPlaying()) return; S.dynOn=!S.dynOn; dynChanged(); toast(S.dynOn?'דינמיקה פועלת · לחיצה ארוכה להגדרות':'דינמיקה כבויה'); });
-  t.addEventListener('contextmenu',e=>e.preventDefault()); })();
+/* tiles: one tap opens the popup (no dragging); the dynamics tile too */
 function trIdleQuiet(){ const P=trPlan(); if(S.tab==='tr'&&!playing) $('trSum').textContent=P.ok?`משך ${fmt(P.total)}`:''; if(typeof trSetUI==='function') trSetUI(); }
 function setBpm(v){
-  S.bpm=clamp(Math.round(v),1,400); if(!TP.typing) $('tpShow').textContent=S.bpm; $('tpName').textContent=tempoName(S.bpm); $('mBpm').textContent=S.bpm; $('qBpm').textContent=S.bpm; $('mName').textContent=tempoName(S.bpm).toUpperCase(); if($('qTempo')) $('qTempo').textContent=tempoName(S.bpm).toUpperCase(); drawTicks(); if(typeof rulerDraw==='function') rulerDraw(); save(); if(typeof presetLabels==='function'&&$('songBtn')) presetLabels();
+  const ob=S.bpm; S.bpm=clamp(Math.round(v),1,400); if(ob!==S.bpm) retime(ob); if(!TP.typing) $('tpShow').textContent=S.bpm; $('tpName').textContent=tempoName(S.bpm); $('mBpm').textContent=S.bpm; $('qBpm').textContent=S.bpm; $('mName').textContent=tempoName(S.bpm).toUpperCase(); if($('qTempo')) $('qTempo').textContent=tempoName(S.bpm).toUpperCase(); drawTicks(); if(typeof rulerDraw==='function') rulerDraw(); save(); if(typeof presetLabels==='function'&&$('songBtn')) presetLabels();
 }
 $('bpmDown').onclick=()=>{ setBpm(S.bpm-5); uiTick(); };
+// thin arrows inside the dial: a tap is ±1, holding repeats and speeds up to ±5 (no bubble)
+[['dArrL',-1],['dArrR',1]].forEach(([id,dir])=>{ const b=$(id); let t=null, n=0;
+  const step=d=>{ const v=Math.abs(d)===5?(dir>0?Math.floor(S.bpm/5)*5+5:Math.ceil(S.bpm/5)*5-5):S.bpm+d; setBpm(v); uiTick(); try{ navigator.vibrate&&navigator.vibrate(3); }catch(e){} };
+  const end=()=>{ clearTimeout(t); t=null; b.classList.remove('hold'); };
+  b.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); try{ b.setPointerCapture(e.pointerId); }catch(x){} n=0; step(dir);
+    const rep=()=>{ n++; b.classList.add('hold'); step(n>6?dir*5:dir); t=setTimeout(rep,n>6?170:110); }; t=setTimeout(rep,420); });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>b.addEventListener(ev,end));
+  b.addEventListener('click',e=>e.stopPropagation()); b.addEventListener('contextmenu',e=>e.preventDefault()); });
 $('bpmUp').onclick=()=>{ setBpm(S.bpm+5); uiTick(); };
 let taps=[];
 function tapTempo(){ if(S.uiSnd&&!playing) ui(t=>click(t,'beat')); const n=performance.now(); taps=taps.filter(t=>n-t<2500); taps.push(n);
@@ -3512,6 +3528,7 @@ function dynUI(){ $('dynOn').checked=!!S.dynOn; $('stickOn').checked=!!S.stick; 
   $('dynSteps').classList.toggle('auto',S.dynAuto!==false); $('dynSteps').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.v===st))); }
 const dynChanged=()=>{ save(); updateQuick(); dynUI(); regen(); };
 $('dynOn').onchange=()=>{ S.dynOn=$('dynOn').checked; dynChanged(); };
+$('stickOn').checked=!!S.stick;
 $('stickOn').onchange=()=>{ S.stick=$('stickOn').checked; save(); dynUI(); if(rhythm) render(); };
 $('dynAuto').onchange=()=>{ S.dynAuto=$('dynAuto').checked; if(!S.dynAuto) S.dynLvl=dynStage(); dynChanged(); };
 $('dynSteps').onclick=e=>{ const b=e.target.closest('button'); if(!b||S.dynAuto!==false) return; S.dynLvl=+b.dataset.v; dynChanged(); };

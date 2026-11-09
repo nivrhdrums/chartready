@@ -20,7 +20,7 @@ async def main():
         await pg.click('#fGo'); await pg.wait_for_timeout(4000); await pg.screenshot(path='s7.png'); await pg.wait_for_timeout(8000)
         print('editor', not await pg.evaluate("document.getElementById('fEd').hidden"))
         await pg.click('[data-tool=sync]'); await pg.wait_for_timeout(300); await pg.screenshot(path='s8.png')
-        await pg.click('#edSave'); await pg.wait_for_timeout(14000)
+        await pg.click('#edSave'); await pg.wait_for_timeout(400); await pg.click('#edOutGo'); await pg.wait_for_timeout(14000)
         data=await pg.evaluate("(async()=>{const b=__nb.FILM.blob; if(!b) return ''; const a=new Uint8Array(await b.arrayBuffer()); let s=''; for(let i=0;i<a.length;i++) s+=String.fromCharCode(a[i]); return btoa(s)})()")
         if data: open('/tmp/claude-0/build/out_fs.webm','wb').write(base64.b64decode(data))
         await pg.evaluate("__nb.filmExit()")

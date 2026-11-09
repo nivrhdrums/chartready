@@ -175,14 +175,13 @@ function filmAbort(){ if(FILM.run){ FILM.ending=false; stop(); } }
 function filmExit(){
   if(FILM.run){ FILM.ending=false; stop(); }
   if(FILM.recOn) filmRecStop(true);
-  if(FILM.micSrc){ try{ FILM.micSrc.disconnect(); }catch(e){} FILM.micSrc=null; }
   if(FILM.stream){ FILM.stream.getTracks().forEach(t=>t.stop()); FILM.stream=null; }
   $('fVid').srcObject=null; $('fCam').hidden=true;
   FILM.on=false; $('film').hidden=true; $('fRes').hidden=true; if(FILM.orig&&FILM.orig.bars){ S.bars=FILM.orig.bars; save(); }
   $('screen').insertBefore($('score'),$('pad'));
   S.level=FILM.orig.level; setBpm(FILM.orig.bpm); save(); updateQuick();
   rhythm=genRhythm(); render(); requestAnimationFrame(fitScore);
-  if(FILM.url){ URL.revokeObjectURL(FILM.url); FILM.url=null; FILM.blob=null; }
+  if(FILM.url){ URL.revokeObjectURL(FILM.url); FILM.url=null; FILM.blob=null; } FILM.out=null;
 }
 function filmKey(e){
   if(e.code==='Escape'){ FILM.run?filmAbort():filmExit(); }
@@ -200,7 +199,7 @@ $('fGo').onclick=filmGo;
 $('fStop').onclick=e=>{ e.stopPropagation(); filmAbort(); };
 $('fExit').onclick=filmExit;
 $('fResClose').onclick=()=>{ $('fRes').hidden=true; };
-$('fSave').onclick=filmSave;
+$('fSave').onclick=()=>{ if(FILM.out&&FILM.out.length) filmShareAll(FILM.out); };
 // stop while running: two fingers, or a long press anywhere
 $('film').addEventListener('pointerdown',e=>{
   FILM.ptrs.add(e.pointerId);
@@ -218,35 +217,61 @@ $('film').addEventListener('pointerdown',e=>{
   c.addEventListener('pointerup',()=>{ if(d){ S.fmCamPos={l:c.style.left,t:c.style.top}; save(); } d=null; });
 })();
 
-/* recording: the frame is painted onto a 1080x1920 canvas every frame, mixed with the app sound and the mic */
-// the frame and the camera are recorded as two files, so the camera and the texts can still be moved after filming
+/* recording, all on one clock:
+   1. the screen (notes) is painted onto a 1080x1920 canvas and recorded as video only
+   2. camera + microphone go into one file, so the two stay in sync by themselves
+   3. the app's sound is not recorded at all: every sound played is logged, and rebuilt clean when saving
+   a small tap on the audio clock (app sound left, mic right) tells the editor exactly where the camera file sits on that clock */
 const REC_TYPES=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
 const CAM_TYPES=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+const AUD_TYPES=['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus'];
 const pickType=L=>L.find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
+var REC={on:false,t0:0,log:[],cap:null};
+// k: c = click, n = note, a = accented note; t = seconds from the start of the recording
+function recLog(k,t,kind){ if(REC.on) REC.log.push({k,t:+(t-REC.t0).toFixed(5),kind:kind||'',snd:S.clickSnd||'pro'}); }
+// loudness of the app sound and the mic, one value per millisecond, on the audio clock
+function recCapStart(stream){
+  const C={t0:null,n:0,sr:ctx.sampleRate,L:[],R:[],mic:false};
+  try{
+    const merge=ctx.createChannelMerger(2), sp=ctx.createScriptProcessor(2048,2,2), mute=ctx.createGain(); mute.gain.value=0;
+    master.connect(merge,0,0);
+    if(stream&&stream.getAudioTracks().length){ C.src=ctx.createMediaStreamSource(new MediaStream(stream.getAudioTracks())); C.src.connect(merge,0,1); C.mic=true; }
+    merge.connect(sp); sp.connect(mute); mute.connect(ctx.destination);
+    sp.onaudioprocess=e=>{ if(!REC.on&&C.t0!=null) return; if(C.t0==null) C.t0=e.playbackTime-REC.t0;
+      const a=e.inputBuffer.getChannelData(0), b=e.inputBuffer.getChannelData(1), L=C.L, R=C.R, f=1000/C.sr;
+      for(let i=0;i<a.length;i++){ const k=Math.floor((C.n+i)*f), x=a[i]<0?-a[i]:a[i], y=b[i]<0?-b[i]:b[i];
+        if(L[k]===undefined){ L[k]=x; R[k]=y; } else { if(x>L[k]) L[k]=x; if(y>R[k]) R[k]=y; } }
+      C.n+=a.length; };
+    C.stop=()=>{ try{ master.disconnect(merge); }catch(e){} try{ C.src&&C.src.disconnect(); merge.disconnect(); sp.disconnect(); mute.disconnect(); }catch(e){} sp.onaudioprocess=null; };
+  }catch(e){ C.stop=()=>{}; }
+  return C;
+}
 function filmRecStart(){
   if(!window.MediaRecorder){ toast('הדפדפן הזה לא תומך בהקלטה'); return false; }
   const cv=FILM.cv||(FILM.cv=document.createElement('canvas')); cv.width=1080; cv.height=1920;
   if(!cv.captureStream){ toast('הדפדפן הזה לא תומך בהקלטה'); return false; }
-  const camOn=!!(FILM.stream&&FILM.stream.getVideoTracks().length);
+  const camOn=!!(FILM.stream&&FILM.stream.getVideoTracks().length), micOn=!!(FILM.stream&&FILM.stream.getAudioTracks().length);
   ['fChal','fHandle','fEnd'].forEach(id=>$(id).setAttribute('data-norec',''));
   if(camOn) $('fCam').setAttribute('data-norec','');
   filmDraw();
-  const vs=cv.captureStream(30);
-  if(!FILM.dest){ FILM.dest=ctx.createMediaStreamDestination(); FILM.dest.channelCount=2; FILM.merge=ctx.createChannelMerger(2); FILM.merge.connect(FILM.dest); }
-  if(!FILM.destOn){ master.connect(FILM.merge,0,0); FILM.destOn=true; }
-  if(FILM.stream&&FILM.stream.getAudioTracks().length&&!FILM.micSrc){ FILM.micSrc=ctx.createMediaStreamSource(FILM.stream); FILM.micSrc.connect(FILM.merge,0,1); }
-  const ms=new MediaStream([...vs.getVideoTracks(),...FILM.dest.stream.getAudioTracks()]);
-  const mt=pickType(REC_TYPES);
-  let rec, crec=null; try{ rec=new MediaRecorder(ms,mt?{mimeType:mt,videoBitsPerSecond:8e6}:{videoBitsPerSecond:8e6}); }catch(e){ toast('לא הצלחתי להתחיל הקלטה'); return false; }
-  if(camOn){ const ct=pickType(CAM_TYPES); try{ crec=new MediaRecorder(new MediaStream(FILM.stream.getVideoTracks()),ct?{mimeType:ct,videoBitsPerSecond:5e6}:{videoBitsPerSecond:5e6}); }catch(e){ crec=null; } }
+  const vs=cv.captureStream(30), bt=pickType(CAM_TYPES);
+  let rec, crec=null;
+  try{ rec=new MediaRecorder(new MediaStream(vs.getVideoTracks()),bt?{mimeType:bt,videoBitsPerSecond:8e6}:{videoBitsPerSecond:8e6}); }catch(e){ toast('לא הצלחתי להתחיל הקלטה'); return false; }
+  if(camOn||micOn){
+    const tracks=[...(camOn?FILM.stream.getVideoTracks():[]),...(micOn?FILM.stream.getAudioTracks():[])];
+    const ct=camOn?pickType(micOn?REC_TYPES:CAM_TYPES):pickType(AUD_TYPES), o={audioBitsPerSecond:192000}; if(camOn) o.videoBitsPerSecond=5e6; if(ct) o.mimeType=ct;
+    try{ crec=new MediaRecorder(new MediaStream(tracks),o); }catch(e){ crec=null; toast('המצלמה לא הוקלטה'); }
+  }
   FILM.chunks=[]; FILM.camChunks=[]; FILM.discard=false; FILM.pending=crec?2:1;
   const fr=$('fFrame').getBoundingClientRect(), sr=$('fScoreSlot').getBoundingClientRect(), cr=$('fCam').getBoundingClientRect();
-  FILM.meta={t0:ctx.currentTime,beats:[],rounds:[],firstPlay:null,endAt:null,scoreTop:(sr.top-fr.top)/fr.height,scoreBot:(sr.bottom-fr.top)/fr.height,scoreL:(sr.left-fr.left)/fr.width,scoreR:(sr.right-fr.left)/fr.width,rounds_total:S.fmMode==='one'?1:S.fmRounds,
-    cam:camOn?{x:(cr.left-fr.left)/fr.width,y:(cr.top-fr.top)/fr.height,w:cr.width/fr.width}:null,camW:0,camH:0};
+  REC.log=[]; REC.t0=ctx.currentTime; REC.on=true; REC.cap=recCapStart(micOn?FILM.stream:null);
+  FILM.meta={t0:REC.t0,beats:[],rounds:[],firstPlay:null,endAt:null,scoreTop:(sr.top-fr.top)/fr.height,scoreBot:(sr.bottom-fr.top)/fr.height,scoreL:(sr.left-fr.left)/fr.width,scoreR:(sr.right-fr.left)/fr.width,rounds_total:S.fmMode==='one'?1:S.fmRounds,
+    cam:camOn?{x:(cr.left-fr.left)/fr.width,y:(cr.top-fr.top)/fr.height,w:cr.width/fr.width}:null,camW:0,camH:0,camOn,micOn:micOn&&!!crec,
+    mix:{click:S.mixMute.click?0:S.mix.click,notes:S.mixMute.notes?0:S.mix.notes,acc:S.mixMute.acc?0:S.mix.acc}};
   if(camOn){ const v=$('fVid'); FILM.meta.camW=v.videoWidth; FILM.meta.camH=v.videoHeight; }
   rec.ondataavailable=e=>{ if(e.data&&e.data.size) FILM.chunks.push(e.data); };
-  rec.onstop=()=>{ FILM.recType=(rec.mimeType||mt||'video/webm'); filmRecDone(); };
-  if(crec){ crec.ondataavailable=e=>{ if(e.data&&e.data.size) FILM.camChunks.push(e.data); }; crec.onstop=()=>{ FILM.camType=crec.mimeType||'video/webm'; filmRecDone(); }; }
+  rec.onstop=()=>{ FILM.recType=(rec.mimeType||bt||'video/webm'); filmRecDone(); };
+  if(crec){ crec.ondataavailable=e=>{ if(e.data&&e.data.size) FILM.camChunks.push(e.data); }; crec.onstop=()=>{ FILM.camType=crec.mimeType||(camOn?'video/webm':'audio/webm'); filmRecDone(); }; }
   FILM.rec=rec; FILM.crec=crec; FILM.recOn=true; FILM.t0=performance.now(); rec.start(1000); if(crec) crec.start(1000);
   filmLoop(); return true;
 }
@@ -258,6 +283,7 @@ function filmLoop(){
   FILM.raf=requestAnimationFrame(filmLoop);
 }
 function filmRecStop(discard){ FILM.recOn=false; FILM.discard=!!discard; cancelAnimationFrame(FILM.raf); $('fRec').hidden=true; ['fChal','fHandle','fEnd','fCam'].forEach(id=>$(id).removeAttribute('data-norec'));
+  REC.on=false; if(FILM.meta){ FILM.meta.log=REC.log.slice(); FILM.meta.cap=REC.cap; } if(REC.cap) REC.cap.stop(); REC.cap=null;
   [FILM.rec,FILM.crec].forEach(r=>{ try{ r&&r.state!=='inactive'&&r.stop(); }catch(e){} }); }
 function filmRecDone(){
   if(--FILM.pending>0) return;
@@ -266,13 +292,11 @@ function filmRecDone(){
   FILM.meta.dur=(performance.now()-FILM.t0)/1000;
   if(FILM.on) edOpen(base,cam,FILM.meta);
 }
-async function filmSave(){
-  const b=FILM.blob; if(!b) return; filmShare(b,FILM.url);
-}
-async function filmShare(b,url){
-  const ext=b.type.includes('mp4')?'mp4':'webm', name=`chartready-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.${ext}`;
-  try{ const file=new File([b],name,{type:b.type}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'ChartReady'}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
-  const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+// several files at once: one share sheet when the phone allows it, otherwise one download per file
+async function filmShareAll(list){
+  try{ const files=list.map(x=>new File([x.blob],x.name,{type:x.blob.type}));
+    if(navigator.canShare&&navigator.canShare({files})){ await navigator.share({files,title:'ChartReady'}); return; } }catch(e){ if(e&&e.name==='AbortError') return; }
+  for(const x of list){ const u=URL.createObjectURL(x.blob), a=document.createElement('a'); a.href=u; a.download=x.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u),60000); await new Promise(r=>setTimeout(r,400)); }
   $('fResHint').textContent='אם ההורדה לא התחילה: לחיצה ארוכה על הווידאו ושמירה.';
 }
 

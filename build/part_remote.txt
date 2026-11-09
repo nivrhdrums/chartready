@@ -80,7 +80,8 @@ onSave=()=>{
   if(RC.remoteMode){ clearTimeout(rcSendT); rcSendT=setTimeout(()=>rsend({k:'S',S}),70); }
   else if(RCS.role==='host'&&RC.peer) hostDirty();
 };
-function deser(st){ const bars=st.bars.map(b=>{ const a=b.g; a.seed=b.s; return a; }); return {bars,num:st.num,den:st.den}; }
+// a bar is an array with extra fields (seed, accents, no-extension); JSON drops those from arrays, so bars travel as history entries
+function deser(st){ const bars=st.bars.map(b=>{ if(b.b) return histBar(b); const a=b.g; a.seed=b.s; return a; }); return {bars,num:st.num,den:st.den}; }
 function rcMsg(d){
   if(RCS.role==='remote'){
     if(d.k==='state'){ RC.applying=true; const tabCh=d.S.tab!==S.tab; Object.assign(S,d.S); if(tabCh) setTab(S.tab); syncUI(); rhythm=deser(d); render(); RC.applying=false; if(RC.live) applyLive(RC.live); }
@@ -99,7 +100,8 @@ function applyPhoneS(ns){
   if(old.timerSec!==S.timerSec||old.clockMode!==S.clockMode){ clockStop(); clk.acc=0; }
   syncUI();
   const ch=k=>JSON.stringify(old[k])!==JSON.stringify(S[k]);
-  if(['grids','level','num','den','bars'].some(ch)) requestNew(); else if(['restLvl','ties','showCount','sextCount'].some(ch)&&rhythm) render();
+  if(old.bpm!==S.bpm) retime(old.bpm);
+  if(['grids','level','num','den','bars'].some(ch)) requestNew(); else if(['restLvl','ties','showCount','sextCount','stick','dynOn'].some(ch)&&rhythm) render();
   RC.applying=false; save(); hostSendState(true);
 }
 /* computer side: send the screen to the phone */
@@ -108,7 +110,7 @@ function hostDirty(){ clearTimeout(hostT); hostT=setTimeout(()=>hostSendState(tr
 function hostSendState(){
   if(RCS.role!=='host'||!RC.peer) return;
   const r=rhythm||{num:S.num,den:S.den,bars:[]}, bars=(shown&&shown.length?shown:r.bars);
-  rsend({k:'state',S,bars:bars.map(b=>({s:b.seed,g:b})),num:r.num,den:r.den});
+  rsend({k:'state',S,bars:bars.map(b=>histEntry(b,r)),num:r.num,den:r.den});
 }
 let trLast=null;
 function hostSendLive(force){
@@ -137,7 +139,7 @@ function syncUI(){
   setBpm(S.bpm); syncGrids(); meterSync(); barsSync(); mbSync();
   ['repeats','mSub','sextCount','trMode','clockMode','clickSnd'].forEach(id=>{ const el=$(id); el&&el._sync&&el._sync(); });
   $('level').value=S.level; $('levelOut').textContent=S.level; restSync(); sndDraw(); gapUI(); trSetUI(); dynMaxUI();
-  ['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]);
+  ['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]); $('stickOn').checked=!!S.stick;
   ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>$(k).value=S[k]);
   secSync(); buildCols(); renderSongs(); renderTrPresets(); renderGenPresets(); updateQuick(); clockTick(); applyVol();
 }

@@ -21,7 +21,7 @@ open(S+'index.html','w').write(h)
 msg=sys.argv[1] if len(sys.argv)>1 else 'Update'
 g=lambda *a: subprocess.run(['git','-C',R]+list(a),check=True)
 g('add','-A')
-subprocess.run(['git','-C',R,'-c','user.name=nivrhdrums','-c','user.email=nivdrumstudio@gmail.com','commit','-qm',msg+'\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_012j8rcQ33ceY5Y2XsebBv6C'])
+subprocess.run(['git','-C',R,'-c','user.name=nivrhdrums','-c','user.email=nivdrumstudio@gmail.com','commit','-qm',msg+'\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_012j8rcPJbiPBehztEQdQPBE'])
 g('push','-q')
 os.chdir(OUT); subprocess.run('rm -f *.zip && zip -qr "ChartReady-אישי.zip" "ChartReady-אישי" && zip -qr "ChartReady-ציבורי.zip" "ChartReady-ציבורי"',shell=True)
 print('deployed', open(B+'ver.txt').read())
