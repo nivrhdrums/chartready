@@ -71,14 +71,20 @@ h2{font:400 20px var(--f-display);margin:0}
 #out{width:100%;min-height:60px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;font:12px var(--f-num);padding:8px;box-sizing:border-box;direction:ltr}
 .dl.lp{margin-top:4px;background:#2a2230}
 .dl.lp b{color:#ff8a5a}
+.vchip{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 14px var(--f-body);padding:8px 14px;border-radius:999px;cursor:pointer}
+.vchip[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.lvh h2{display:flex;align-items:center;gap:10px}.ln{display:inline-grid;place-items:center;min-width:34px;height:34px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font:800 18px var(--f-num)}
+.ldesc{color:var(--muted);font-size:14px;line-height:1.7;margin:2px 0 10px}.ldesc b{color:var(--ink)}
+.outsec{margin:18px 0}.outsec summary{cursor:pointer;font-weight:800;padding:8px 0;color:var(--muted)}
 </style>
 
 <div class="wrap" dir="rtl">
   <header>
-    <h1>מפת מקצבים</h1>
-    <p class="lead">כל המקצבים שהמחולל יכול לכתוב, בכתיבה לפי הספר (כתיבה מקצועית: מקצוען). סקסטולות מופיעות בכל הצורות שהאפליקציה עשויה לבחור. גע בכרטיס כדי לסמן שלא יופיע, ובסוף לחץ "העתק" ושלח לי.</p>
+    <h1>מפת מקצבים · גרסה 2.0.23</h1>
+    <p class="lead">המסלול כפי שהוא עכשיו באפליקציה: מה נכנס בכל רמה מתוך 13, במרובעים ובמשולשים. הכתיבה כמו באפליקציה היום (נקודות כבויות). אפשר לשנות רמה של מקצב עם − / +. גע בכרטיס כדי לסמן שלא יופיע, ובסוף לחץ "העתק" ושלח לי.</p>
   </header>
   <div class="how"><b>ציון קושי (1 עד 10).</b> כל מקצב מתחיל מבסיס לפי החלוקה: רבעים ושמיניות 0, שש־עשריות 1, טריולות 2, סקסטולות וטריולת רבעים 3, טריולת חצאים 4. נוסף <b>2</b> אם הפעמה מתחילה בהפסקה, <b>1.5</b> לכל מכה שלא על מקום חזק כשלפניה אין מכה (e או a בודדים, & של טריולה), <b>0.5</b> לכל הפסקה באמצע, ובסקסטולות <b>1</b> אם היא רק בתחושה של 3 ו־<b>3</b> אם היא "בין התחושות". הציון הוא 1 ועוד הסכום. תקן עם − ו־+ כל מקום שלא מרגיש לך נכון.</div>
+  <div class="filters" id="views"><button class="vchip" data-v="lvl" aria-pressed="true">לפי רמה</button><button class="vchip" data-v="fam" aria-pressed="false">לפי משפחה</button></div>
   <div class="filters" id="filters"><button class="fchip" data-f="all" aria-pressed="true">הכל</button><button class="fchip" data-f="1">קל 1–3</button><button class="fchip" data-f="2">בינוני 4–6</button><button class="fchip" data-f="3">קשה 7–10</button></div>
   <div id="sections"></div>
   <textarea id="out" readonly hidden aria-label="הרשימה להעתקה"></textarea>
@@ -88,7 +94,7 @@ h2{font:400 20px var(--f-display);margin:0}
 <script>
 (function(){
 const $=id=>document.getElementById(id);
-const S={restLvl:0,ties:false,showCount:true,sextCount:'mix'};
+const S={restLvl:0,ties:false,dots:false,stick:false,dynOn:false,showCount:true,sextCount:'mix',mode:'free',grids:{3:true,6:true,L:true}};
 /* ---------- notation ---------- */
 const SP=10, L=62, STEMTOP=L-3.5*SP, HW=11.8, SW=1.3, PADL=10;
 const GL={whole:'',half:'',black:'',f8:'',f16:'',r1:'',r2:'',r4:'',r8:'',r16:'',dot:''};
@@ -100,7 +106,10 @@ const isInt=x=>Math.abs(x-Math.round(x))<1e-9;
 // Turns generated hits into written notes. opt: {p: rest level 0..1, feel:'d'|'t', longBroken, ties}
 function notate(bar,r,seed,opt){
   opt=opt||{};
-  const p=opt.p!=null?opt.p:S.restLvl/100, ties=opt.ties!=null?opt.ties:S.ties, up=r.den===4?12:6, R=rng(seed||1);
+  // a path bar carries its level (bar.lv): ties over the beat from 12, ties inside the beat from 11, triplet shorthand from 11
+  const lv=bar.lv||0, dots=opt.dots!=null?opt.dots:!!S.dots;
+  const p=opt.p!=null?opt.p:S.restLvl/100, ties=opt.ties!=null?opt.ties:(lv?lv>=12:S.ties), tieIn=!dots&&(lv?lv>=11:ties), up=r.den===4?12:6, R=rng(seed||1);
+  const brN={};
   const ch=x=>x>=1?true:x<=0?false:R()<x;
   const groups=[], toks=[]; let brId=0, tk=0;
   const mk=(g,kind,tick,dur,tup,br)=>{const t={kind,tick,dur,grp:g,tup:!!tup,br}; toks.push(t); return t;};
@@ -110,8 +119,9 @@ function notate(bar,r,seed,opt){
       let j=i+1; while(j<end&&!on[j]) j++;
       if(on[i]){
         const nv=mode==='rests'?1:vals.find(v=>v<=j-i);
-        mk(g,'note',g.start+i*u,nv*u,tup,br); let q=i+nv;
-        greedy(j-i-nv,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;});
+        const N=mk(g,'note',g.start+i*u,nv*u,tup,br); let q=i+nv;
+        if(tieIn&&mode!=='rests'&&!tup&&j-i>nv&&j-i===nv*1.5){ const T=mk(g,'note',g.start+q*u,(j-i-nv)*u,tup,br); T.tied=true; N.tieTo=T; q=j; }
+        greedy(j-i-nv,vals).forEach(v=>{ if(q>=j) return; mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;});
       } else { let q=i; greedy(j-i,vals).forEach(v=>{mk(g,'rest',g.start+q*u,v*u,tup,br);q+=v;}); }
       i=j;
     }
@@ -119,24 +129,27 @@ function notate(bar,r,seed,opt){
   function sext(g,on,u,mode){
     const s=on.map(x=>x?'1':'0').join(''), okH=h=>h==='100'||h==='111'||h==='000';
     const dOk=okH(s.slice(0,3))&&okH(s.slice(3)), tOk=s.indexOf('1')%2===0;
-    g.simple=dOk;
     let feel;
-    if(s==='000001'){ feel='d'; mode='extend'; }
+    if(s==='111111') feel=opt.feel||(S.sextCount==='eighth'?'d':S.sextCount==='num'?'t':(ch(.5)?'d':'t'));
+    else if(SX_FEEL[s]) feel=SX_FEEL[s];
+    else if(s==='000001'){ feel='d'; mode='extend'; }
     else if(opt.feel&&(opt.feel==='d'?dOk:tOk)) feel=opt.feel;
     else if(dOk&&tOk) feel=ch(.5)?'d':'t';
     else if(dOk) feel='d'; else if(tOk) feel='t';
     else feel=mode==='extend'?'d':(ch(.5)?'d':'t3');
+    g.simple=feel==='d';
     if(feel==='d'){
+      // 3+3: two brackets of 3; an empty half is an eighth rest, a half with only its first note is a plain eighth (no dot)
       [0,3].forEach(o=>{
         const hp=s.slice(o,o+3);
         if(hp==='000'){ mk(g,'rest',g.start+o*u,3*u,0,null); return; }
-        if(hp==='100'&&mode==='extend'){ mk(g,'note',g.start+o*u,3*u,0,null); return; }
+        if(hp==='100'){ mk(g,'note',g.start+o*u,3*u,0,null); return; }
         tokenize(g,on,o,3,u,[2,1],mode,1,brId++);
       });
     } else {
-      const br=brId++;
-      if(feel==='t'&&mode==='extend') tokenize(g,on,0,6,u,[4,3,2,1],'extend',1,br);
-      else [0,2,4].forEach(o=>tokenize(g,on,o,2,u,[2,1],'extend',1,br));
+      // 2+2+2: one bracket of 6 over pairs
+      const br=brId++; brN[br]=6;
+      [0,2,4].forEach(o=>tokenize(g,on,o,2,u,[2,1],'extend',1,br));
     }
   }
   function processQ(bt,start,len){
@@ -146,9 +159,9 @@ function notate(bar,r,seed,opt){
     if(!raw){ if(!hits.length) G=bt.t==='q'?1:bt.k; else G=(bt.t==='q'?[1,2,3,4,6]:[bt.k,2*bt.k]).find(c=>hits.every(o=>isInt(o*c/len))); }
     const g={t:bt.t,k:bt.k,start,len,G,tup:bt.t==='q'&&(G===3||G===6)?G:0}; groups.push(g);
     const u=len/G, on=new Array(G).fill(false); hits.forEach(o=>on[Math.round(o/u)]=true);
-    const mode=restMode?'rests':'extend';
+    const mode=restMode||(lv&&lv<11&&g.tup===3)?'rests':'extend';
     if(g.tup===6){ sext(g,on,u,mode); return; }
-    const vals=g.t==='q'?{1:[1],2:[2,1],4:[4,3,2,1],3:[2,1]}[G]:(G===g.k?[3,2,1]:[6,4,3,2,1]).filter(v=>v<=G);
+    const vals=g.t==='q'?{1:[1],2:[2,1],4:dots?[4,3,2,1]:[4,2,1],3:[2,1]}[G]:(G===g.k?[3,2,1]:[6,4,3,2,1]).filter(v=>v<=G);
     tokenize(g,on,0,G,u,vals,mode,g.tup,g.tup?brId++:null);
   }
   bar.forEach(bt=>{
@@ -171,6 +184,8 @@ function notate(bar,r,seed,opt){
     });
   });
   const total=tk, plain=g=>!g.tup&&!g.long;
+  if(bar.ti){ const f=toks.find(t=>t.tick===0); if(f&&f.kind==='rest'){ f.kind='note'; f.tied=true; f.tieIn=true; } }
+  if(bar.to){ let l=null; toks.forEach(t=>{ if(t.kind==='note'&&(!l||t.tick>l.tick)) l=t; }); if(l) l.tieOut=true; }
   if(r.den===4){
     for(let x=0;x<toks.length;x++){
       const N=toks[x];
@@ -180,9 +195,9 @@ function notate(bar,r,seed,opt){
       let stop=y<toks.length?toks[y].tick:total;
       for(let z=x+1;z<=y&&z<toks.length;z++) if(!plain(toks[z].grp)){ stop=Math.min(stop,toks[z].grp.start); break; }
       const avail=stop-N.tick;
-      const c=[48,36,24,18,12].find(d=>d>N.dur&&d<=avail&&(d===48?N.tick===0:d>=24?N.tick%12===0:N.tick%6===0));
+      const c=(dots?[48,36,24,18,12]:[48,24,12]).find(d=>d>N.dur&&d<=avail&&(d===48?N.tick===0:d>=24?N.tick%12===0:N.tick%6===0));
       const nx=toks[x+1], canTie=ties&&nx.kind==='rest'&&plain(nx.grp)&&nx.tick===N.tick+N.dur;
-      const opts=[]; if(c) opts.push('ext'); if(canTie) opts.push('tie');
+      const opts=[]; if(c&&!bar.noExt) opts.push('ext'); if(canTie) opts.push('tie');
       if(!opts.length||ch(p)) continue;
       const pick=opts[Math.floor(R()*opts.length)];
       if(pick==='tie'){ nx.kind='note'; nx.tied=true; N.tieTo=nx; continue; }
@@ -192,7 +207,7 @@ function notate(bar,r,seed,opt){
         const t=toks[z], te=t.tick+t.dur;
         if(te<=E) continue;
         if(t.tick>=E){ keep.push(t); continue; }
-        let q=E; greedy(te-E,[12,9,6,3]).forEach(v=>{keep.push({kind:'rest',tick:q,dur:v,grp:t.grp,tup:false,br:null});q+=v;});
+        let q=E; greedy(te-E,dots?[12,9,6,3]:[12,6,3]).forEach(v=>{keep.push({kind:'rest',tick:q,dur:v,grp:t.grp,tup:false,br:null});q+=v;});
       }
       toks.splice(x+1,y-x-1,...keep);
     }
@@ -201,12 +216,14 @@ function notate(bar,r,seed,opt){
       if(a.kind==='rest'&&b.kind==='rest'&&!a.tup&&!b.tup&&a.dur===12&&b.dur===12&&a.tick%24===0&&b.tick===a.tick+12&&plain(a.grp)&&plain(b.grp)&&!ch(p)){ a.dur=24; toks.splice(x+1,1); }
     }
   }
-  return {groups,toks,total,den:r.den,num:r.num};
+  return {groups,toks,total,den:r.den,num:r.num,brN};
 }
-function groupW(g,used){ if(g.long) return g.k===2?150:240; if(!used) return 34; if(g.t==='e') return (g.G===g.k?24:15)*g.G+12; return {1:40,2:52,3:62,4:76,6:100}[g.G]; }
+function groupW(g,used){ if(g.long) return g.k===2?150:240; if(!used) return 34; if(g.t==='e') return (g.G===g.k?24:15)*g.G+12; return {1:40,2:52,3:80,4:76,6:128}[g.G]; }
 function layoutBar(bar,r,opt){
   const nt=notate(bar,r,bar.seed,opt), used=new Set(nt.toks.map(t=>t.grp));
-  let x=PADL; nt.groups.forEach(g=>{g.w=groupW(g,used.has(g)); g.x=x; x+=g.w;});
+  // a flagged note right before a longer note in a tuplet (8th then quarter) gets extra room for its flag
+  const flagGap=g=>{ if(!g.tup) return 0; const ts=nt.toks.filter(t=>t.grp===g); return ts.some((t,i)=>t.kind==='note'&&ts[i+1]&&ts[i+1].kind==='note'&&t.dur<ts[i+1].dur)?10:0; };
+  let x=PADL; nt.groups.forEach(g=>{g.w=groupW(g,used.has(g))+flagGap(g); g.x=x; x+=g.w;});
   nt.width=x+10; return nt;
 }
 const tickX=(g,t)=>g.x+8+(t-g.start)/g.len*(g.w-16);
@@ -218,10 +235,21 @@ function syl(t,g){
   return [n,'e','&','a'][Math.round(f*4)];
 }
 const mg=(ch,x,y)=>`<text class="mg" x="${x.toFixed(1)}" y="${y}">${ch}</text>`;
+function tupletsPossible(){
+  const m=S.mode||'free';
+  if(m==='path') return !!S.trkT||S.trkD===false;
+  if(m==='manual') return (S.manual||[]).some(c=>c[0]!=='4');
+  return !!(S.grids[3]||S.grids[6]||S.grids.L);
+}
 function svgBar(bar,bi,r,width,opt){
   const nt=layoutBar(bar,r,opt), H=S.showCount?100:80;
+  const stick=!!(S.stick), CY=stick?L+43:L+32;
   const kx=(width-PADL-10)/(nt.width-PADL-10), X=x=>PADL+(x-PADL)*kx;
-  const tx=t=>X(tickX(t.grp,t.tick));
+  // inside a tuplet a flagged note before a longer one (8th then quarter) pushes the next note right so the flag never touches it
+  const TXS=new Map();
+  nt.groups.forEach(g=>{ if(!g.tup) return; const ts=nt.toks.filter(t=>t.grp===g);
+    ts.forEach((t,i)=>{ const p=ts[i-1]; if(p&&p.kind==='note'&&t.kind==='note'&&p.dur<t.dur){ const px=TXS.get(p)??X(tickX(g,p.tick)); TXS.set(t,Math.max(X(tickX(g,t.tick)),px+HW+15)); } }); });
+  const tx=t=>TXS.get(t)??X(tickX(t.grp,t.tick));
   const nd=t=>t.tup?t.dur*3/2:t.dur;
   const id=t=>`n${bi}_${Math.round(t.tick)}`;
   const sx=t=>tx(t)+HW-SW/2;
@@ -238,7 +266,7 @@ function svgBar(bar,bi,r,width,opt){
   const beamed=new Set(); runs.forEach(rn=>{ if(rn.length>1) rn.forEach(t=>beamed.add(t)); });
   nt.toks.forEach(t=>{
     const x=tx(t), v=nd(t);
-    if(t.kind==='rest'){ const [g,dot]=RV[v]||RV[12]; s+=mg(GL[g],x-2,L); if(dot) s+=mg(GL.dot,x+12,L-5); return; }
+    if(t.kind==='rest'){ const [g,dot]=RV[v]||RV[12]; s+=mg(GL[g],t.tup&&v<=3?x+1.5:x-2,L); if(dot) s+=mg(GL.dot,x+12,L-5); return; }
     const info=NV[v]||NV[12];
     // hollow heads: a thin outline with no staff line showing through
     const hx=x+(info.h==='whole'?7.2:5.9), hole=info.h==='whole'?`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="3" ry="4" transform="rotate(-30 ${hx.toFixed(1)} ${L})"/>`:`<ellipse class="hole" cx="${hx.toFixed(1)}" cy="${L}" rx="4.8" ry="3" transform="rotate(-25 ${hx.toFixed(1)} ${L})"/>`;
@@ -246,10 +274,11 @@ function svgBar(bar,bi,r,width,opt){
     if(info.h!=='whole') inner+=`<line class="stem" x1="${sx(t)}" y1="${L-1.7}" x2="${sx(t)}" y2="${STEMTOP}"/>`;
     if(info.b&&!beamed.has(t)) inner+=mg(info.b===2?GL.f16:GL.f8,x+HW-SW,STEMTOP);
     s+=t.tied?`<g>${inner}</g>`:`<g class="n" id="${id(t)}">${inner}</g>`;
-    if(info.d) s+=mg(GL.dot,x+HW+4,L-5);
+    // a flagged note's dot goes past the flag so it doesn't sit inside the curl
+    if(info.d) s+=mg(GL.dot,x+HW+(info.b&&!beamed.has(t)?13:4),L-5);
   });
-  nt.toks.forEach(t=>{ if(!t.tieTo) return; const x1=tx(t)+7, x2=tx(t.tieTo)+5, m=(x1+x2)/2;
-    s+=`<path class="tie" d="M${x1} ${L+7} Q${m} ${L+17} ${x2} ${L+7} Q${m} ${L+13} ${x1} ${L+7}Z"/>`; });
+  const tieP=(x1,x2)=>{ const m=(x1+x2)/2; return `<path class="tie" d="M${x1} ${L+7} Q${m} ${L+17} ${x2} ${L+7} Q${m} ${L+13} ${x1} ${L+7}Z"/>`; };
+  nt.toks.forEach(t=>{ if(t.tieTo) s+=tieP(tx(t)+7,tx(t.tieTo)+5); if(t.tieIn) s+=tieP(1,tx(t)+5); if(t.tieOut) s+=tieP(tx(t)+7,width-3); });
   runs.forEach(rn=>{
     if(rn.length<2) return;
     const a=sx(rn[0]), b=sx(rn[rn.length-1]);
@@ -265,8 +294,8 @@ function svgBar(bar,bi,r,width,opt){
   const brs={}; nt.toks.forEach(t=>{ if(t.br!=null) (brs[t.br]=brs[t.br]||[]).push(t); });
   Object.values(brs).forEach(ts=>{
     const last=ts[ts.length-1], endT=Math.max(...ts.map(t=>t.tick+t.dur)), flagged=last.kind==='note'&&!beamed.has(last)&&(NV[nd(last)]||NV[12]).b;
-    const a=tx(ts[0])+(ts[0].kind==='note'?4:0), b=Math.max(tx(last)+HW+(flagged?14:6), X(tickX(last.grp,endT))-6), m=(a+b)/2, y=STEMTOP-8;
-    s+=`<path class="tripline" d="M${a} ${y+6} v-6 H${m-7} M${m+7} ${y} H${b} v6"/><text class="trip" x="${m}" y="${y+4}">3</text>`;
+    const a=tx(ts[0])+(ts[0].kind==='note'?4:0), b=Math.max(tx(last)+HW+(flagged?14:6), X(tickX(last.grp,endT))-6), m=(a+b)/2, accIn=(bar.acc||[]).some(k=>ts.some(t=>t.kind==='note'&&Math.round(t.tick)===k)), y=accIn?STEMTOP-19:STEMTOP-6;
+    s+=`<path class="tripline" d="M${a} ${y+6} v-6 H${m-7} M${m+7} ${y} H${b} v6"/><text class="trip" x="${m}" y="${y+4}">${nt.brN[ts[0].br]||3}</text>`;
   });
   if(S.showCount){
     // every count position of each beat, at the finest subdivision that beat uses
@@ -274,7 +303,7 @@ function svgBar(bar,bi,r,width,opt){
     const tokAt=new Map(nt.toks.map(t=>[Math.round(t.tick),t])), done=new Set();
     const put=(g,tt)=>{ const k=Math.round(tt); if(done.has(k)) return; const lab=syl(tt,g); if(!lab) return; done.add(k);
       const t=tokAt.get(k), x=t?tx(t):X(tickX(g,tt));
-      s+=`<text class="cnt${hitAt.has(k)?' hit':''}"${t?` id="c${id(t)}"`:''} x="${(x+HW/2).toFixed(1)}" y="${L+32}">${lab}</text>`; };
+      s+=`<text class="cnt${hitAt.has(k)?' hit':''}"${t?` id="c${id(t)}"`:''} x="${(x+HW/2).toFixed(1)}" y="${CY}">${lab}</text>`; };
     nt.groups.forEach(g=>{
       if(g.long){ for(let i=0;i<g.k*3;i++) put(g,g.start+i*4); return; }
       let G=g.G;
@@ -283,11 +312,23 @@ function svgBar(bar,bi,r,width,opt){
       for(let i=0;i<G;i++) put(g,g.start+i*g.len/G);
     });
   }
+  if((bar.acc&&bar.acc.length)||(S.stick)){
+    const acc=new Set(bar.acc||[]), hm=S.stick?stickMap(bar,r.den):null;
+    nt.toks.forEach(t=>{ if(t.kind!=='note'||t.tied) return; const k=Math.round(t.tick), cx=tx(t)+HW/2;
+      if(acc.has(k)){ const ax=t.dur>=48?cx:sx(t), ay=STEMTOP-8; s+=`<path class="accent" d="M${(ax-5.5).toFixed(1)} ${ay-4} L${(ax+5.5).toFixed(1)} ${ay} L${(ax-5.5).toFixed(1)} ${ay+4}"/>`; }
+      if(hm&&hm.has(k)) s+=`<text class="stk${hm.get(k)==='L'?' l':''}" x="${cx.toFixed(1)}" y="${L+31}">${hm.get(k)}</text>`; });
+  }
   s+=`<line class="barline" x1="${width-1}" y1="${L-16}" x2="${width-1}" y2="${L+16}"/>`;
   // crop to what this bar uses: room for a tuplet bracket only when there is one, the count row only when shown
-  const Y0=nt.groups.some(g=>g.tup||g.long)?STEMTOP-22:STEMTOP-4, Y1=S.showCount?L+36:L+22;
+  // every bar on screen gets the same crop so all bars are drawn at the same size:
+  // room for a tuplet bracket whenever the current style can produce one
+  // accents sit just above the stems; inside a tuplet the bracket is lifted above them
+  const tupOn=tupletsPossible()||nt.groups.some(g=>g.tup||g.long), Y0=S.dynOn?(tupOn?STEMTOP-26:STEMTOP-14):(tupOn?STEMTOP-13:STEMTOP-3), Y1=S.showCount?CY+4:stick?L+33:L+19;
   return `<svg viewBox="0 ${Y0} ${width} ${Y1-Y0}" role="img" aria-label="תיבה ${typeof bi==='number'?bi+1:'הבאה'}">${s}</svg>`;
 }
+let rhythm=null, layoutW=360, shown=[];
+
+const SX_FEEL={'111100':'d','100111':'d','111000':'d','000111':'d','111110':'t','101111':'t','111011':'t','111010':'t','101110':'t','101011':'t','011111':'t','001111':'t','110111':'t','111101':'t','110110':'t'};
 const B=s=>[...s].map(c=>c==='1');
 function diffRaw(p){
   if(p.long){ const s=p.bits; let r=p.long===2?3:4; if(s[0]!=='1') r+=2;
@@ -312,7 +353,11 @@ const saveD=()=>{ try{localStorage.setItem('rhythmdiff',JSON.stringify(dEdit))}c
 const diffOf=p=>dEdit[p.code]!=null?dEdit[p.code]:autoDiff(p);
 const band=d=>d<=3?1:d<=6?2:3;
 // path level: the level at which this pattern enters the teaching ladder (0 = not in the path)
-const PATH={"4:0000": 2, "4:1000": 1, "4:0010": 2, "4:1010": 1, "4:0001": 8, "4:0011": 5, "4:0100": 8, "4:0101": 9, "4:0110": 8, "4:0111": 5, "4:1001": 6, "4:1011": 5, "4:1100": 6, "4:1101": 7, "4:1110": 5, "4:1111": 3, "3:001": 5, "3:010": 5, "3:011": 3, "3:101": 2, "3:110": 3, "3:111": 1, "6:000001": 9, "6:000111": 7, "6:001111": 8, "6:011111": 9, "6:100111": 7, "6:101011": 7, "6:101110": 8, "6:101111": 8, "6:110110": 9, "6:110111": 8, "6:111010": 9, "6:111011": 8, "6:111100": 7, "6:111101": 9, "6:111110": 7, "6:111111": 7, "Q:101010": 4, "Q:101000": 6, "Q:100010": 6, "Q:100000": 6, "Q:001010": 6, "Q:001000": 6, "Q:000010": 6, "H:101010": 6};
+const PATH={"4:0000":1,"4:1000":1,"4:0010":3,"4:1010":2,"4:0001":9,"4:0011":7,"4:0100":9,"4:0101":8,"4:0110":8,"4:0111":6,"4:1001":9,"4:1011":5,"4:1100":7,"4:1101":6,"4:1110":5,"4:1111":4,"3:001":9,"3:010":9,"3:011":6,"3:101":4,"3:110":4,"3:111":2,"6:000111":11,"6:001111":11,"6:011111":11,"6:100111":8,"6:101011":10,"6:101110":10,"6:101111":9,"6:110110":11,"6:110111":11,"6:111000":8,"6:111010":10,"6:111011":9,"6:111100":8,"6:111101":11,"6:111110":9,"6:111111":7,"Q:101010":12,"Q:101000":13,"Q:100010":13,"Q:100000":13,"Q:001010":13,"Q:001000":13,"Q:000010":13,"H:101010":13};
+const DESC_D=['רבעים, חצאים ושלמים','שמיניות','שמינית על ה־&','4 שש־עשריות','3 על הפעמה: 16-16-8, 8-16-16','3 עם סינקופה: 16-8-16, הפסקה + 3','2 על הפעמה: 1e, &a','2 בלי הפעמה: e&, e-a','e לבד, a לבד, 1-a','ערבוב סינקופות','קשתות בתוך הפעמה','קשתות מעל הפעמה','קשתות מעל קו התיבה'];
+const DESC_T=['','טריולה מלאה מול שמיניות','מעבר 2↔3 בתוך התיבה','2 מתוך 3 על הפעמה','','פעמה ריקה בטריולה','סקסטולה מלאה','סקסטולות 3+3','1 מתוך 3 · סקסטולות 2+2+2','סקסטולות עם הפסקות','סקסטולות קשות · כתיבה מקוצרת','טריולת רבעים','טריולת חצאים וקשתות'];
+const E8={3:{'100':1,'110':1,'111':2,'101':3,'000':3,'011':6,'010':9,'001':9},2:{'10':1,'11':2,'00':3,'01':6},1:{'1':1}};
+
 let lEdit={}; try{ lEdit=JSON.parse(localStorage.getItem('rhythmlvl')||'{}'); }catch(e){}
 const saveL=()=>{ try{localStorage.setItem('rhythmlvl',JSON.stringify(lEdit))}catch(e){} };
 const lvlOf=p=>lEdit[p.code]!=null?lEdit[p.code]:(PATH[p.code]||0);
@@ -343,17 +388,9 @@ const save=()=>{ try{localStorage.setItem('rhythmmap',JSON.stringify([...off]))}
 // every way the app may write this beat, at the cleanest setting
 function variants(p){
   if(p.long){ const bar=[{t:'L',k:p.long,g:6,slots:B(p.bits)}]; bar.seed=1; return [[svgBar(bar,'v',{num:p.long,den:4},p.long===2?300:470,{p:0,longBroken:false}),'']]; }
-  const bar=[{t:'q',k:1,g:p.g,slots:B(p.bits)}]; bar.seed=1;
-  if(p.g!==6) return [[svgBar(bar,'v',{num:1,den:4},150,{p:0}),'']];
-  const out=[], s=p.bits, okH=h=>h==='100'||h==='111'||h==='000';
-  const dOk=okH(s.slice(0,3))&&okH(s.slice(3)), tOk=s.indexOf('1')%2===0;
-  if(dOk) out.push([svgBar(bar,'v',{num:1,den:4},150,{p:0,feel:'d'}),'תחושה של 2']);
-  if(tOk) out.push([svgBar(bar,'v',{num:1,den:4},150,{p:0,feel:'t'}),'תחושה של 3']);
-  if(!dOk&&!tOk){
-    out.push([svgBar(bar,'v',{num:1,den:4},150,{p:0}),'תחושה של 2']);
-    out.push([svgBar(bar,'v',{num:1,den:4},150,{p:1,feel:'d'}),'2, עם הפסקות']);
-    out.push([svgBar(bar,'v',{num:1,den:4},150,{p:1,feel:'t'}),'3, עם הפסקות']);
-  }
+  const bar=[{t:'q',k:1,g:p.g,slots:B(p.bits)}]; bar.seed=1; bar.lv=lvlOf(p)||13; // written the way the path writes it at that level
+  if(p.g!==6||p.bits!=='111111') return [[svgBar(bar,'v',{num:1,den:4},p.g===6?170:150,{p:0}),SX_FEEL[p.bits]==='d'?'3+3':SX_FEEL[p.bits]==='t'?'2+2+2':'']];
+  const out=[[svgBar(bar,'v',{num:1,den:4},170,{p:0,feel:'d'}),'3+3'],[svgBar(bar,'v',{num:1,den:4},170,{p:0,feel:'t'}),'2+2+2']];
   return out;
 }
 function card(p){
@@ -364,19 +401,35 @@ function card(p){
     <div class="dl lv${band(d)}${dEdit[p.code]!=null?' edited':''}"><button data-dd="-1" data-k="${p.code}" aria-label="פחות קשה">−</button><span>קושי <b>${d}</b></span><button data-dd="1" data-k="${p.code}" aria-label="יותר קשה">+</button></div>
     <div class="dl lp${lEdit[p.code]!=null?' edited':''}"><button data-ld="-1" data-k="${p.code}" aria-label="רמה נמוכה יותר">−</button><span>מסלול <b>${lvlOf(p)||'—'}</b></span><button data-ld="1" data-k="${p.code}" aria-label="רמה גבוהה יותר">+</button></div></div>`;
 }
-$('sections').innerHTML=fams.map(f=>`<section data-f="${f.id}"><div class="sh"><h2>${f.name}</h2><div class="secbtns"><small>${list[f.id].length} מקצבים</small><button class="mini" data-all="${f.id}" data-v="0">להשאיר הכל</button><button class="mini" data-all="${f.id}" data-v="1">להוציא הכל</button></div></div><div class="grid">${list[f.id].map(card).join('')}</div></section>`).join('');
+const famHTML=()=>fams.map(f=>`<section data-f="${f.id}"><div class="sh"><h2>${f.name}</h2><div class="secbtns"><small>${list[f.id].length} מקצבים</small><button class="mini" data-all="${f.id}" data-v="0">להשאיר הכל</button><button class="mini" data-all="${f.id}" data-v="1">להוציא הכל</button></div></div><div class="grid">${list[f.id].map(card).join('')}</div></section>`).join('');
+const TRK=c=>c==='4:1000'||c==='4:0000'?'שני המסלולים':c[0]==='4'?'מרובעים':'משולשים';
+const lvlHTML=()=>{ const all=Object.values(list).flat(); let h='';
+  for(let L=1;L<=13;L++){ const ps=all.filter(p=>lvlOf(p)===L).sort((a,b)=>(a.code[0]==='4'?0:1)-(b.code[0]==='4'?0:1)||diffOf(a)-diffOf(b));
+    const e8=[3,2].map(k=>Object.keys(E8[k]).filter(x=>E8[k][x]===L).map(x=>x)).flat();
+    const dd=DESC_D[L-1], dt=DESC_T[L-1];
+    h+=`<section data-l="${L}"><div class="sh lvh"><h2><span class="ln">${L}</span>${L===13?'מקצוען':''}</h2><small>${ps.length?ps.length+' מקצבים חדשים':''}</small></div>
+      <div class="ldesc"><div><b>מרובעים:</b> ${dd||'—'}</div><div><b>משולשים:</b> ${dt||'—'}</div>${e8.length?`<div><b>6/8 (שמיניות):</b> <span dir="ltr">${e8.join(' · ')}</span></div>`:''}${L===4?'<div><b>6/8:</b> מכאן גם שש־עשריות</div>':''}</div>
+      ${ps.length?`<div class="grid">${ps.map(card).join('')}</div>`:''}</section>`; }
+  const out=all.filter(p=>!lvlOf(p));
+  h+=`<details class="outsec"><summary>לא במסלול (${out.length})</summary><div class="grid">${out.map(card).join('')}</div></details>`;
+  return h; };
+let view='lvl';
+const draw=()=>{ $('sections').innerHTML=view==='lvl'?lvlHTML():famHTML(); applyFilter(); };
+draw();
 function upd(){ $('cnt').textContent=off.size; $('cntTxt').textContent=`מקצבים הוצאו · ${Object.keys(dEdit).length} ציונים · ${Object.keys(lEdit).length} רמות מסלול תוקנו`; $('out').hidden=true; }
 function applyFilter(){ document.querySelectorAll('.cell').forEach(el=>{ el.hidden=filt!=='all'&&el.dataset.band!==filt; }); }
 document.addEventListener('click',e=>{
   const ld=e.target.closest('[data-ld]');
-  if(ld){ const k=ld.dataset.k, p=Object.values(list).flat().find(x=>x.code===k), nv=Math.max(0,Math.min(10,lvlOf(p)+ +ld.dataset.ld));
+  if(ld){ const k=ld.dataset.k, p=Object.values(list).flat().find(x=>x.code===k), nv=Math.max(0,Math.min(13,lvlOf(p)+ +ld.dataset.ld));
     if(nv===(PATH[k]||0)) delete lEdit[k]; else lEdit[k]=nv; saveL();
-    const box=document.querySelector(`[data-cell="${k}"] .lp`); box.querySelector('b').textContent=nv||'—'; box.classList.toggle('edited',lEdit[k]!=null); upd(); return; }
+    const box=document.querySelector(`[data-cell="${k}"] .lp`); box.querySelector('b').textContent=nv||'—'; box.classList.toggle('edited',lEdit[k]!=null); upd(); if(view==='lvl') draw(); return; }
   const dd=e.target.closest('[data-dd]');
   if(dd){ const k=dd.dataset.k, p=Object.values(list).flat().find(x=>x.code===k), nv=Math.max(1,Math.min(10,diffOf(p)+ +dd.dataset.dd));
     if(nv===autoDiff(p)) delete dEdit[k]; else dEdit[k]=nv; saveD();
     const cell=document.querySelector(`[data-cell="${k}"]`); const box=cell.querySelector('.dl'); box.querySelector('b').textContent=nv;
     box.className=`dl lv${band(nv)}${dEdit[k]!=null?' edited':''}`; cell.dataset.band=band(nv); upd(); return; }
+  const vc=e.target.closest('.vchip');
+  if(vc){ view=vc.dataset.v; document.querySelectorAll('.vchip').forEach(b=>b.setAttribute('aria-pressed',String(b===vc))); draw(); return; }
   const fc=e.target.closest('.fchip');
   if(fc){ filt=fc.dataset.f; document.querySelectorAll('.fchip').forEach(b=>b.setAttribute('aria-pressed',String(b===fc))); applyFilter(); return; }
   const c=e.target.closest('.cardb');
