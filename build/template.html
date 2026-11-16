@@ -388,6 +388,16 @@ select.num{width:76px}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 {{UICSS}}
+
+/* while playing the reading screen: only the bars and a slim stop button (phone layout) */
+@media (max-width:899px),(max-aspect-ratio:1/1){
+  .screen.focus header.top,.screen.focus #quickGen,.screen.focus .ruler,.screen.focus .tabbar,.screen.focus .kbhint,.screen.focus #newBtn,.screen.focus #filmBtn,.screen.focus #mTap,.screen.focus #songBtn,.screen.focus #trPresetBtn{display:none!important}
+  .screen.focus .deck{padding-top:6px}
+  .screen.focus .transport{display:flex}
+  .screen.focus .big{height:46px;font-size:17px}
+}
+.barbox.two svg{flex:1 1 0}
+.barbox.two svg+svg{margin-top:4px}
 </style>
 
 <div class="screen" dir="rtl" id="screen">
@@ -3264,6 +3274,8 @@ function setPlayingUI(on){
   $('play').setAttribute('aria-label',on?'עצור':'נגן'); $('screen').classList.toggle('playing',on);
   $('tabSet').classList.toggle('off',on);
   $('screen').classList.toggle('lock',on);
+  $('screen').classList.toggle('focus',on&&S.tab==='gen');
+  if(on&&S.tab==='gen') $('playL').textContent=`עצור · ${S.bpm}`;
 }
 async function start(){
   await initAudio(); applyVol();
@@ -3739,11 +3751,16 @@ document.addEventListener('keydown',e=>{ if(FILM.on){ filmKey(e); return; }
 function fitScore(){
   const sc=$('score'); if(sc.hidden) return;
   const boxes=[...sc.querySelectorAll('.barbox')], n=boxes.length; if(!n) return;
-  const vb=boxes[0].querySelector('svg').viewBox.baseVal, ratio=vb.height/vb.width, cs=getComputedStyle(sc), gap=parseFloat(cs.rowGap)||8, pad=16;
+  const svg=boxes[0].querySelector('svg'); if(!svg) return;
+  const vbH=svg.viewBox.baseVal.height, cs=getComputedStyle(sc), gap=parseFloat(cs.rowGap)||8, pad=16;
   const W=sc.clientWidth, H=sc.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0)-1;
-  // px per notation unit: the layout that draws the notes bigger wins
-  const fit=c=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*ratio+pad, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,h,px:Math.min(cw/vb.width,(h-pad)/vb.height)}; };
-  let f=fit(1); if(n>=3){ const f2=fit(2); if(f2.px>f.px*1.05) f=f2; }
+  const r=shownR&&shown.length?{bars:shown,num:shownR.num,den:shownR.den}:null;
+  const Ws=r?widthFor(r,false):svg.viewBox.baseVal.width, Wh=r&&canSplit(r)?widthFor(r,true):0;
+  // px per notation unit: the layout that draws the notes bigger wins (1 column, 2 columns, or each bar on two lines)
+  const fit=(c,lines,vw)=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*vbH/vw*lines+pad+(lines-1)*4, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,lines,h,px:Math.min(cw/vw,(h-pad-(lines-1)*4)/(vbH*lines))}; };
+  let f=fit(1,1,Ws); if(n>=3){ const f2=fit(2,1,Ws); if(f2.px>f.px*1.05) f=f2; }
+  if(Wh){ const f3=fit(1,2,Wh); if(f3.px>f.px*(LAY.split?1.02:1.2)) f=f3; }
+  const sp=f.lines===2; if(sp!==LAY.split){ LAY.split=sp; relayout(); }
   sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(18,f.h).toFixed(2)}px`; // never scroll: every bar is on screen
 }
 new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }catch(e){} }).observe($('score'),{childList:true});

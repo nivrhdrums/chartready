@@ -422,7 +422,7 @@ function histFill(el,ri,from){
   const run=HIST.runs[ri], n=run.bars.length, idx=[];
   for(let k=from;k<Math.min(n,from+20);k++) idx.push(n-1-k);
   if(!idx.length) return;
-  const bars=idx.map(i=>histBar(run.bars[i])), W=widthFor({bars,num:run.num,den:run.den});
+  const bars=idx.map(i=>histBar(run.bars[i])), W=widthFor({bars,num:run.num,den:run.den},false);
   el.insertAdjacentHTML('beforeend',idx.map((i,j)=>{ const e=run.bars[i];
     return `<button class="hb${e.p?'':' unplayed'}${HIST.sel.has(ri+':'+i)?' sel':''}" data-k="${ri}:${i}"><span class="hn">${i+1}</span>${svgBar(bars[j],`h${ri}_${i}`,{num:e.n||run.num,den:e.d||run.den},W)}</button>`; }).join(''));
   if(from+20<n){ const s=document.createElement('div'); s.className='hmore'; el.appendChild(s);
