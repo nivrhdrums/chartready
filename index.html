@@ -880,6 +880,16 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 .fres video[hidden]{display:none}
 .fres:has(.frlist:not(:empty)) video{max-height:44vh}
 
+
+/* while playing the reading screen: only the bars and a slim stop button (phone layout) */
+@media (max-width:899px),(max-aspect-ratio:1/1){
+  .screen.focus header.top,.screen.focus #quickGen,.screen.focus .ruler,.screen.focus .tabbar,.screen.focus .kbhint,.screen.focus #newBtn,.screen.focus #filmBtn,.screen.focus #mTap,.screen.focus #songBtn,.screen.focus #trPresetBtn{display:none!important}
+  .screen.focus .deck{padding-top:6px}
+  .screen.focus .transport{display:flex}
+  .screen.focus .big{height:46px;font-size:17px}
+}
+.barbox.two svg{flex:1 1 0}
+.barbox.two svg+svg{margin-top:4px}
 </style>
 </head>
 <body>
@@ -887,7 +897,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="screen" dir="rtl" id="screen">
   <header class="top">
-    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.23</span></div></div>
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.24</span></div></div>
     <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
     <div class="hicons" dir="ltr">
       <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -1050,7 +1060,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
       <label class="toggle"><input type="checkbox" id="stickOn"><span class="cic" dir="ltr">R L</span><span><b>סטיקינג מתחת לתווים</b><small>סינגלים לפי החלוקה, רבעים תמיד R</small></span></label>
     </section>
     <section class="sec" data-st="about" hidden>
-      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.23</div></div>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.24</div></div>
       <button class="remlock" id="remLock">סודי 🔒</button>
       <div id="remPanel" hidden>
         <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
@@ -3942,7 +3952,7 @@ function svgBar(bar,bi,r,width,opt){
     ts.forEach((t,i)=>{ const p=ts[i-1]; if(p&&p.kind==='note'&&t.kind==='note'&&p.dur<t.dur){ const px=TXS.get(p)??X(tickX(g,p.tick)); TXS.set(t,Math.max(X(tickX(g,t.tick)),px+HW+15)); } }); });
   const tx=t=>TXS.get(t)??X(tickX(t.grp,t.tick));
   const nd=t=>t.tup?t.dur*3/2:t.dur;
-  const id=t=>`n${bi}_${Math.round(t.tick)}`;
+  const OFF=(opt&&opt.off)||0, id=t=>`n${bi}_${Math.round(t.tick)+OFF}`;
   const sx=t=>tx(t)+HW-SW/2;
   let s=`<line class="staff" x1="0" y1="${L}" x2="${width}" y2="${L}"/>`;
   const runs=[];
@@ -3992,7 +4002,7 @@ function svgBar(bar,bi,r,width,opt){
     // every count position of each beat, at the finest subdivision that beat uses
     const hitAt=new Set(nt.toks.filter(t=>t.kind==='note'&&!t.tied).map(t=>Math.round(t.tick)));
     const tokAt=new Map(nt.toks.map(t=>[Math.round(t.tick),t])), done=new Set();
-    const put=(g,tt)=>{ const k=Math.round(tt); if(done.has(k)) return; const lab=syl(tt,g); if(!lab) return; done.add(k);
+    const put=(g,tt)=>{ const k=Math.round(tt); if(done.has(k)) return; const lab=syl(tt+OFF,g); if(!lab) return; done.add(k);
       const t=tokAt.get(k), x=t?tx(t):X(tickX(g,tt));
       s+=`<text class="cnt${hitAt.has(k)?' hit':''}"${t?` id="c${id(t)}"`:''} x="${(x+HW/2).toFixed(1)}" y="${CY}">${lab}</text>`; };
     nt.groups.forEach(g=>{
@@ -4004,12 +4014,12 @@ function svgBar(bar,bi,r,width,opt){
     });
   }
   if((bar.acc&&bar.acc.length)||(S.stick)){
-    const acc=new Set(bar.acc||[]), hm=S.stick?stickMap(bar,r.den):null;
+    const acc=new Set(bar.acc||[]), hm=S.stick?((opt&&opt.hm)||stickMap(bar,r.den)):null;
     nt.toks.forEach(t=>{ if(t.kind!=='note'||t.tied) return; const k=Math.round(t.tick), cx=tx(t)+HW/2;
       if(acc.has(k)){ const ax=t.dur>=48?cx:sx(t), ay=STEMTOP-8; s+=`<path class="accent" d="M${(ax-5.5).toFixed(1)} ${ay-4} L${(ax+5.5).toFixed(1)} ${ay} L${(ax-5.5).toFixed(1)} ${ay+4}"/>`; }
       if(hm&&hm.has(k)) s+=`<text class="stk${hm.get(k)==='L'?' l':''}" x="${cx.toFixed(1)}" y="${L+31}">${hm.get(k)}</text>`; });
   }
-  s+=`<line class="barline" x1="${width-1}" y1="${L-16}" x2="${width-1}" y2="${L+16}"/>`;
+  if(!(opt&&opt.noBL)) s+=`<line class="barline" x1="${width-1}" y1="${L-16}" x2="${width-1}" y2="${L+16}"/>`;
   // crop to what this bar uses: room for a tuplet bracket only when there is one, the count row only when shown
   // every bar on screen gets the same crop so all bars are drawn at the same size:
   // room for a tuplet bracket whenever the current style can produce one
@@ -4017,12 +4027,44 @@ function svgBar(bar,bi,r,width,opt){
   const tupOn=tupletsPossible()||nt.groups.some(g=>g.tup||g.long), Y0=S.dynOn?(tupOn?STEMTOP-26:STEMTOP-14):(tupOn?STEMTOP-13:STEMTOP-3), Y1=S.showCount?CY+4:stick?L+33:L+19;
   return `<svg viewBox="0 ${Y0} ${width} ${Y1-Y0}" role="img" aria-label="תיבה ${typeof bi==='number'?bi+1:'הבאה'}">${s}</svg>`;
 }
-let rhythm=null, layoutW=360, shown=[];
-const widthFor=r=>Math.max(270,...r.bars.map(b=>layoutBar(b,r).width));
-const barHTML=(b,i,r)=>`<div class="barbox" id="bar${i}"><div class="barnum">${i+1}</div>${svgBar(b,i,r,layoutW)}</div>`;
-function render(r){ r=r||rhythm; layoutW=widthFor(r); shown=r.bars.slice(); $('score').innerHTML=r.bars.map((b,i)=>barHTML(b,i,r)).join(''); $('score').scrollTop=0; HIST.slot=[]; r.bars.forEach((b,i)=>histPush(i,b,r)); }
-function swapBar(i,r){ const el=$('bar'+i); if(!el) return; layoutW=Math.max(layoutW,widthFor(r)); shown[i]=r.bars[i]; el.outerHTML=barHTML(r.bars[i],i,r); histPush(i,r.bars[i],r); const n=$('bar'+i); if(n) n.classList.add('fresh'); }
-function showPreview(r){ clearPreview(); $('score').insertAdjacentHTML('beforeend',`<div class="barbox preview" id="barNext"><div class="barnum">הבא</div>${svgBar(r.bars[0],'x',r,layoutW)}</div>`); }
+let rhythm=null, layoutW=360, shown=[], shownR=null;
+// a bar can be drawn on two lines (half a bar each) when that lets the notes come out clearly bigger, e.g. while playing on a phone
+const LAY={split:false};
+function halves(b,r){
+  if(r.den!==4||r.num<4||r.num%2) return null;
+  const h=r.num/2; let u=0,i=0; while(i<b.length&&u<h){ u+=b[i].k||1; i++; }
+  if(u!==h||i>=b.length) return null;
+  const off=h*12, cp=a=>{ const x=a.slice(); Object.keys(b).forEach(k=>{ if(isNaN(+k)) x[k]=b[k]; }); delete x.ti; delete x.to; delete x.acc; return x; };
+  const A=cp(b.slice(0,i)), B=cp(b.slice(i));
+  if(b.ti) A.ti=true; if(b.to) B.to=true;
+  if(b.acc){ A.acc=b.acc.filter(k=>k<off); B.acc=b.acc.filter(k=>k>=off).map(k=>k-off); }
+  return {A,B,off,r2:Object.assign({},r,{num:h})};
+}
+const canSplit=r=>r.bars.every(b=>!!halves(b,r));
+const widthFor=(r,sp=LAY.split)=>sp&&canSplit(r)?Math.max(150,...r.bars.map(b=>{ const H=halves(b,r); return Math.max(layoutBar(H.A,H.r2).width,layoutBar(H.B,H.r2).width); })):Math.max(200,...r.bars.map(b=>layoutBar(b,r).width));
+function barSvgs(b,bi,r){
+  const H=LAY.split?halves(b,r):null;
+  if(!H) return svgBar(b,bi,r,layoutW);
+  let hm=null; if(S.stick){ const m=stickMap(b,r.den); hm={A:new Map([...m].filter(([k])=>k<H.off)),B:new Map([...m].filter(([k])=>k>=H.off).map(([k,v])=>[k-H.off,v]))}; }
+  return svgBar(H.A,bi,H.r2,layoutW,{noBL:true,hm:hm&&hm.A})+svgBar(H.B,bi,H.r2,layoutW,{off:H.off,hm:hm&&hm.B});
+}
+const barHTML=(b,i,r)=>`<div class="barbox${LAY.split?' two':''}" id="bar${i}"><div class="barnum">${i+1}</div>${barSvgs(b,i,r)}</div>`;
+function render(r){ r=r||rhythm; shownR=r; if(LAY.split&&!canSplit(r)) LAY.split=false; layoutW=widthFor(r); shown=r.bars.slice(); $('score').innerHTML=r.bars.map((b,i)=>barHTML(b,i,r)).join(''); $('score').scrollTop=0; HIST.slot=[]; r.bars.forEach((b,i)=>histPush(i,b,r)); }
+// redraw what is on screen in the current layout, keeping highlights and history as they are
+function relayout(){
+  if(!shown.length||!shownR) return;
+  const r={bars:shown,num:shownR.num,den:shownR.den};
+  if(LAY.split&&!canSplit(r)) LAY.split=false;
+  layoutW=widthFor(r);
+  shown.forEach((b,i)=>{ const el=$('bar'+i); if(!el) return; el.classList.toggle('two',LAY.split); el.innerHTML=`<div class="barnum">${i+1}</div>${barSvgs(b,i,r)}`; });
+  const p=$('barNext'); if(p&&p._b){ p.classList.toggle('two',LAY.split); p.innerHTML=`<div class="barnum">הבא</div>${barSvgs(p._b,'x',p._r)}`; }
+}
+function swapBar(i,r){ const el=$('bar'+i); if(!el) return; shownR=r; shown[i]=r.bars[i];
+  const all={bars:shown,num:r.num,den:r.den};
+  if(LAY.split&&!canSplit(all)){ LAY.split=false; relayout(); }
+  const w=Math.max(widthFor(all),widthFor(r)); if(w>layoutW+0.5){ layoutW=w; relayout(); }
+  const n0=$('bar'+i); n0.outerHTML=barHTML(r.bars[i],i,r); histPush(i,r.bars[i],r); const n=$('bar'+i); if(n) n.classList.add('fresh'); }
+function showPreview(r){ clearPreview(); $('score').insertAdjacentHTML('beforeend',`<div class="barbox preview${LAY.split?' two':''}" id="barNext"><div class="barnum">הבא</div>${barSvgs(r.bars[0],'x',r)}</div>`); const p=$('barNext'); if(p){ p._b=r.bars[0]; p._r=r; } }
 function clearPreview(){ const p=$('barNext'); if(p) p.remove(); }
 function setCurBar(b,total,rep){
   if(HIST.slot[b]) HIST.slot[b].p=true;
@@ -4330,6 +4372,8 @@ function setPlayingUI(on){
   $('play').setAttribute('aria-label',on?'עצור':'נגן'); $('screen').classList.toggle('playing',on);
   $('tabSet').classList.toggle('off',on);
   $('screen').classList.toggle('lock',on);
+  $('screen').classList.toggle('focus',on&&S.tab==='gen');
+  if(on&&S.tab==='gen') $('playL').textContent=`עצור · ${S.bpm}`;
 }
 async function start(){
   await initAudio(); applyVol();
@@ -4792,7 +4836,7 @@ function histFill(el,ri,from){
   const run=HIST.runs[ri], n=run.bars.length, idx=[];
   for(let k=from;k<Math.min(n,from+20);k++) idx.push(n-1-k);
   if(!idx.length) return;
-  const bars=idx.map(i=>histBar(run.bars[i])), W=widthFor({bars,num:run.num,den:run.den});
+  const bars=idx.map(i=>histBar(run.bars[i])), W=widthFor({bars,num:run.num,den:run.den},false);
   el.insertAdjacentHTML('beforeend',idx.map((i,j)=>{ const e=run.bars[i];
     return `<button class="hb${e.p?'':' unplayed'}${HIST.sel.has(ri+':'+i)?' sel':''}" data-k="${ri}:${i}"><span class="hn">${i+1}</span>${svgBar(bars[j],`h${ri}_${i}`,{num:e.n||run.num,den:e.d||run.den},W)}</button>`; }).join(''));
   if(from+20<n){ const s=document.createElement('div'); s.className='hmore'; el.appendChild(s);
@@ -5872,11 +5916,16 @@ document.addEventListener('keydown',e=>{ if(FILM.on){ filmKey(e); return; }
 function fitScore(){
   const sc=$('score'); if(sc.hidden) return;
   const boxes=[...sc.querySelectorAll('.barbox')], n=boxes.length; if(!n) return;
-  const vb=boxes[0].querySelector('svg').viewBox.baseVal, ratio=vb.height/vb.width, cs=getComputedStyle(sc), gap=parseFloat(cs.rowGap)||8, pad=16;
+  const svg=boxes[0].querySelector('svg'); if(!svg) return;
+  const vbH=svg.viewBox.baseVal.height, cs=getComputedStyle(sc), gap=parseFloat(cs.rowGap)||8, pad=16;
   const W=sc.clientWidth, H=sc.clientHeight-(parseFloat(cs.paddingTop)||0)-(parseFloat(cs.paddingBottom)||0)-1;
-  // px per notation unit: the layout that draws the notes bigger wins
-  const fit=c=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*ratio+pad, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,h,px:Math.min(cw/vb.width,(h-pad)/vb.height)}; };
-  let f=fit(1); if(n>=3){ const f2=fit(2); if(f2.px>f.px*1.05) f=f2; }
+  const r=shownR&&shown.length?{bars:shown,num:shownR.num,den:shownR.den}:null;
+  const Ws=r?widthFor(r,false):svg.viewBox.baseVal.width, Wh=r&&canSplit(r)?widthFor(r,true):0;
+  // px per notation unit: the layout that draws the notes bigger wins (1 column, 2 columns, or each bar on two lines)
+  const fit=(c,lines,vw)=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*vbH/vw*lines+pad+(lines-1)*4, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,lines,h,px:Math.min(cw/vw,(h-pad-(lines-1)*4)/(vbH*lines))}; };
+  let f=fit(1,1,Ws); if(n>=3){ const f2=fit(2,1,Ws); if(f2.px>f.px*1.05) f=f2; }
+  if(Wh){ const f3=fit(1,2,Wh); if(f3.px>f.px*(LAY.split?1.02:1.2)) f=f3; }
+  const sp=f.lines===2; if(sp!==LAY.split){ LAY.split=sp; relayout(); }
   sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(18,f.h).toFixed(2)}px`; // never scroll: every bar is on screen
 }
 new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }catch(e){} }).observe($('score'),{childList:true});
