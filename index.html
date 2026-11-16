@@ -897,7 +897,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="screen" dir="rtl" id="screen">
   <header class="top">
-    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.25</span></div></div>
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.26</span></div></div>
     <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
     <div class="hicons" dir="ltr">
       <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -1040,7 +1040,6 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
     <section class="sec" data-st="read">
       <div class="field"><div class="srow"><span class="sic">✍</span><div><b>כתיבה מקצועית</b><small>איך נכתבות הפסקות בתוך פעמה</small></div></div>
         <div class="seg3" id="restSeg"><button data-v="0">מקצוען</button><button data-v="50">מעורב</button><button data-v="100">חובבן</button></div></div>
-      <label class="toggle"><input type="checkbox" id="dots"><span><b>כתיבה מנוקדת</b><small>רבע ושמינית עם נקודה. כבוי: אותם קצבים, עם הפסקות ושש־עשריות</small></span></label>
       <label class="toggle"><input type="checkbox" id="ties"><span><b>חיבורים (קשתות)</b><small>תווים מחוברים בין פעמות. במסלול הקשתות באות לפי הרמה</small></span></label>
       <div class="field"><div class="srow"><span class="sic">🔁</span><div><b>מקצב חדש אחרי</b></div></div><div class="chips" id="repeats"></div></div>
       <label class="toggle"><input type="checkbox" id="tapOn"><span><b>ניגון יחד</b><small>מתופפים על המסך ומקבלים ניקוד</small></span></label>
@@ -1060,7 +1059,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
       <label class="toggle"><input type="checkbox" id="stickOn"><span class="cic" dir="ltr">R L</span><span><b>סטיקינג מתחת לתווים</b><small>סינגלים לפי החלוקה, רבעים תמיד R</small></span></label>
     </section>
     <section class="sec" data-st="about" hidden>
-      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.25</div></div>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.26</div></div>
       <button class="remlock" id="remLock">סודי 🔒</button>
       <div id="remPanel" hidden>
         <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
@@ -4403,7 +4402,23 @@ function sched(){
 }
 // tempo changed while playing: take back what is already queued and continue in the new tempo from the next click.
 // the click that just sounded stays the anchor, so the very next gap is already in the new tempo
-function retime(oldBpm){
+// turning the wheel sends many tempo changes a second: apply them at most every 120 ms and never just before a click,
+// so the next click always sounds (before, each change pushed the coming click a bit later and the click could vanish)
+const RTQ={timer:0,last:0};
+function retime(){
+  if(playing&&S.tab==='gen') $('playL').textContent=`עצור · ${S.bpm}`;
+  if(!playing||!cur||!ctx) return;
+  if(RTQ.timer) return;
+  const go=()=>{ RTQ.timer=0; if(!playing||!cur||!ctx) return;
+    const C=cur, now=ctx.currentTime; let nx=null;
+    if(C.ev) for(const e of C.ev){ if(e.type!=='click') continue; const t=C.start+e.b*C.bd; if(t>now){ nx=t-now; break; } }
+    const wait=Math.max(0,0.12-(performance.now()-RTQ.last)/1000);
+    if(nx!=null&&nx<0.08){ RTQ.timer=setTimeout(go,(nx+0.03)*1000); return; }
+    if(wait>0){ RTQ.timer=setTimeout(go,wait*1000); return; }
+    RTQ.last=performance.now(); retimeNow(); };
+  go();
+}
+function retimeNow(){
   if(!playing||!cur||!ctx||cur.kind==='end'||S.tab==='tr'||(FILM&&FILM.run)) return;
   const C=cur, ob=C.bd, nb=60/S.bpm; if(Math.abs(ob-nb)<1e-9) return;
   const now=ctx.currentTime, eps=0.004, old=C.start;
@@ -4614,7 +4629,7 @@ async function filmMedia(){
   try{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw new Error('no media');
     FILM.stream=await navigator.mediaDevices.getUserMedia({
-      video:S.fmCam?{facingMode:S.fmFacing||'user',width:{ideal:720},height:{ideal:960}}:false,
+      video:S.fmCam?{facingMode:S.fmFacing||'user',width:{ideal:720},height:{ideal:960},frameRate:{ideal:30,min:24}}:false,
       audio:(S.fmRec&&S.fmMic)?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false});
     if(!FILM.on){ FILM.stream.getTracks().forEach(t=>t.stop()); FILM.stream=null; return; }
     if(FILM.stream.getVideoTracks().length){ $('fVid').srcObject=FILM.stream; $('fCam').hidden=false; if(S.fmCamPos){ $('fCam').style.left=S.fmCamPos.l; $('fCam').style.top=S.fmCamPos.t; $('fCam').style.bottom='auto'; } try{ await $('fVid').play(); }catch(e){} }
@@ -5361,10 +5376,14 @@ async function edExport(o){
     const A=ctx.currentTime+P+0.25, srcs=outs.filter(x=>x.buf).map(x=>edSrc(ctx,x.buf,x.dest,0,A-P));
     try{ vb.playbackRate=1; await vb.play(); if(ED.hasCam){ vc.playbackRate=1; await vc.play(); } }catch(e){}
     const c=()=>a+(ctx.currentTime-A);
-    const draw=()=>{ const t=c()-R; edSlave(vb,t,0.3); if(ED.hasCam) edSlave(vc,edCamT(t),0.3); outs.forEach(x=>x.video(x.g,t)); };
+    // draw 30 times a second, not on every screen refresh: drawing every output on every refresh was too much for a phone
+    // and the files came out below 30 fps and jerky
+    let lastD=-1;
+    const draw=(force)=>{ const t=c()-R; edSlave(vb,t,0.3); if(ED.hasCam) edSlave(vc,edCamT(t),0.3);
+      const now=performance.now(); if(!force&&lastD>=0&&now-lastD<31) return; lastD=now; outs.forEach(x=>x.video(x.g,t)); };
     // start every recorder on the same tick, a moment before content time a
     await new Promise(res=>{ const w=()=>{ if(ctx.currentTime>=A-0.03||EDX.cancel) return res(); draw(); requestAnimationFrame(w); }; w(); });
-    draw(); outs.forEach(x=>x.rec.start(500)); st=ctx.currentTime-A;
+    draw(true); outs.forEach(x=>x.rec.start(500)); st=ctx.currentTime-A;
     await new Promise(res=>{ const tick=()=>{ if(!EDX||EDX.cancel) return res();
       const f=clamp((c()-a)/len,0,1); draw(); $('edPct').textContent=Math.round(f*100)+'%'; $('edRing').style.setProperty('--p',f); $('edLeft').textContent=`עוד כ־${Math.max(1,Math.ceil(b-c()))} שניות`;
       if(c()>=b) return res(); requestAnimationFrame(tick); }; tick(); });
@@ -5685,7 +5704,8 @@ $('manGroups').onclick=e=>{
   else return;
   S.manual=[...set]; save(); updateQuick(); if(a||z) manRender(); else $('manCount').textContent=`${set.size} צורות נבחרו`; clearTimeout(manRender._t); manRender._t=setTimeout(regen,350);
 };
-['clickOn','noteSound','countIn','showCount','ties','dots','gapOn','uiSnd','askDelOn'].forEach(k=>{
+S.dots=false; // the dotted-writing switch is gone (Niv, 16.11): the path writes each shape its own way
+['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd','askDelOn'].forEach(k=>{
   const el=$(k); el.checked=!!S[k]; el.onchange=()=>{S[k]=el.checked; save(); updateQuick(); if(k==='gapOn') gapUI(); if((k==='showCount'||k==='ties'||k==='dots')&&rhythm) render();};
 });
 ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>bindNum(k,k));
@@ -6141,7 +6161,7 @@ function syncUI(){
   setBpm(S.bpm); syncGrids(); meterSync(); barsSync(); mbSync();
   ['repeats','mSub','sextCount','trMode','clockMode','clickSnd'].forEach(id=>{ const el=$(id); el&&el._sync&&el._sync(); });
   $('level').value=S.level; $('levelOut').textContent=S.level; restSync(); sndDraw(); gapUI(); trSetUI(); dynMaxUI();
-  ['clickOn','noteSound','countIn','showCount','ties','dots','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]); $('stickOn').checked=!!S.stick;
+  ['clickOn','noteSound','countIn','showCount','ties','gapOn','uiSnd'].forEach(k=>$(k).checked=!!S[k]); $('stickOn').checked=!!S.stick;
   ['gapPlay','gapMute','trStart','trMax','trStep','trBars'].forEach(k=>$(k).value=S[k]);
   secSync(); buildCols(); renderSongs(); renderTrPresets(); renderGenPresets(); updateQuick(); clockTick(); applyVol();
 }
