@@ -897,7 +897,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
 
 <div class="screen" dir="rtl" id="screen">
   <header class="top">
-    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.27</span></div></div>
+    <div class="brand"><div class="logo">Chart<span>Ready</span></div><div class="by">נבנה על ידי ניב רבין חרמש <span class="hver" dir="ltr">v2.0.28</span></div></div>
     <div class="remind" id="remInd" hidden><i></i><span id="remIndT">טלפון</span></div>
     <div class="hicons" dir="ltr">
       <button class="hic" id="volBtn" data-pop="vol" aria-label="עוצמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg></button>
@@ -1059,7 +1059,7 @@ header.top{flex-direction:row;justify-content:space-between;align-items:center;p
       <label class="toggle"><input type="checkbox" id="stickOn"><span class="cic" dir="ltr">R L</span><span><b>סטיקינג מתחת לתווים</b><small>סינגלים לפי החלוקה, רבעים תמיד R</small></span></label>
     </section>
     <section class="sec" data-st="about" hidden>
-      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.27</div></div>
+      <div class="about"><div class="logo">Chart<span>Ready</span></div><div>מאמן הקריאה לנגנים</div><div class="by">נבנה על ידי ניב רבין חרמש</div><div class="copy">© 2026 ניב רבין חרמש · כל הזכויות שמורות</div><div class="ver" id="verTxt">גרסה 2.0.28</div></div>
       <button class="remlock" id="remLock">סודי 🔒</button>
       <div id="remPanel" hidden>
         <div class="seg2" id="secSeg"><button data-s="film" aria-pressed="true">🎬 צילום</button><button data-s="rem" aria-pressed="false">📡 שלט רחוק</button></div>
@@ -4409,13 +4409,15 @@ function retime(){
   if(playing&&S.tab==='gen') $('playL').textContent=`עצור · ${S.bpm}`;
   if(!playing||!cur||!ctx) return;
   if(RTQ.timer) return;
-  // the new tempo starts right after the next click, like a hardware metronome: the beat in progress keeps its length,
-  // and while the wheel keeps turning every beat takes the tempo shown when it starts
+  // the new tempo counts from the click that just sounded, right away (so going from 10 to 200 doesn't wait out a 6-second beat);
+  // a click due within 60 ms is never moved, and changes are applied at most every 50 ms
   const go=()=>{ RTQ.timer=0; if(!playing||!cur||!ctx) return;
-    const C=cur, now=ctx.currentTime; let last=null, nx=null;
-    if(C.ev) for(const e of C.ev){ if(e.type!=='click'||e.kind==='sub') continue; const t=C.start+e.b*C.bd; if(t<=now) last=t; else { nx=t; break; } }
-    if(last!=null&&now-last<0.1){ RTQ.last=performance.now(); retimeNow(); return; }
-    RTQ.timer=setTimeout(go,nx!=null?Math.max(5,(nx-now+0.012)*1000):30); };
+    const C=cur, now=ctx.currentTime; let nx=null;
+    if(C.ev) for(const e of C.ev){ if(e.type!=='click') continue; const t=C.start+e.b*C.bd; if(t>now){ nx=t; break; } }
+    if(nx!=null&&nx-now<0.06){ RTQ.timer=setTimeout(go,Math.max(5,(nx-now+0.02)*1000)); return; }
+    const wait=0.05-(performance.now()-RTQ.last)/1000;
+    if(wait>0){ RTQ.timer=setTimeout(go,wait*1000); return; }
+    RTQ.last=performance.now(); retimeNow(); };
   go();
 }
 function retimeNow(){
