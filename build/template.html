@@ -3243,13 +3243,13 @@ function retime(){
   if(playing&&S.tab==='gen') $('playL').textContent=`עצור · ${S.bpm}`;
   if(!playing||!cur||!ctx) return;
   if(RTQ.timer) return;
+  // the new tempo starts right after the next click, like a hardware metronome: the beat in progress keeps its length,
+  // and while the wheel keeps turning every beat takes the tempo shown when it starts
   const go=()=>{ RTQ.timer=0; if(!playing||!cur||!ctx) return;
-    const C=cur, now=ctx.currentTime; let nx=null;
-    if(C.ev) for(const e of C.ev){ if(e.type!=='click') continue; const t=C.start+e.b*C.bd; if(t>now){ nx=t-now; break; } }
-    const wait=Math.max(0,0.12-(performance.now()-RTQ.last)/1000);
-    if(nx!=null&&nx<0.08){ RTQ.timer=setTimeout(go,(nx+0.03)*1000); return; }
-    if(wait>0){ RTQ.timer=setTimeout(go,wait*1000); return; }
-    RTQ.last=performance.now(); retimeNow(); };
+    const C=cur, now=ctx.currentTime; let last=null, nx=null;
+    if(C.ev) for(const e of C.ev){ if(e.type!=='click'||e.kind==='sub') continue; const t=C.start+e.b*C.bd; if(t<=now) last=t; else { nx=t; break; } }
+    if(last!=null&&now-last<0.1){ RTQ.last=performance.now(); retimeNow(); return; }
+    RTQ.timer=setTimeout(go,nx!=null?Math.max(5,(nx-now+0.012)*1000):30); };
   go();
 }
 function retimeNow(){
