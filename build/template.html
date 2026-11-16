@@ -3258,9 +3258,12 @@ function retimeNow(){
   if(!playing||!cur||!ctx||cur.kind==='end'||S.tab==='tr'||(FILM&&FILM.run)) return;
   const C=cur, ob=C.bd, nb=60/S.bpm; if(Math.abs(ob-nb)<1e-9) return;
   const now=ctx.currentTime, eps=0.004, old=C.start;
-  TRK=TRK.filter(x=>{ if(x.t>now+eps){ try{ x.n.stop(0); }catch(e){} try{ x.n.disconnect(); }catch(e){} return false; } return x.t>now-2; });
+  // sounds already queued from the loop before this one (they sit before C.start) stay where they are:
+  // the scheduler has moved on from that loop and would never queue them again (that was the click that went missing)
+  TRK=TRK.filter(x=>{ if(x.t>now+eps&&x.t>=old-eps){ try{ x.n.stop(0); }catch(e){} try{ x.n.disconnect(); }catch(e){} return false; } return x.t>now-2; });
   let pLast=null; for(const e of C.ev){ if(e.type!=='click') continue; if(old+e.b*ob<=now+eps) pLast=e.b; else break; }
-  if(pLast==null) pLast=Math.min(0,Math.floor((now-old)/ob+1e-9));
+  // this loop hasn't started yet: count from the last beat of the loop before (played, or still queued and kept)
+  if(pLast==null) pLast=-1;
   let ns=old+pLast*ob-pLast*nb;
   let i=C.ev.findIndex(e=>old+e.b*ob>now+eps); if(i<0) i=C.ev.length;
   const nextB=i<C.ev.length?C.ev[i].b:C.len; const tn=ns+nextB*nb; if(tn<now+0.03) ns+=now+0.03-tn;
@@ -3268,7 +3271,7 @@ function retimeNow(){
   visQ.forEach(v=>{ v.t=map(v.t); });
   TAP.exp.forEach(e=>{ e.t=map(e.t); }); TAP.bars.forEach(b=>{ b.start=map(b.start); b.end=map(b.end); });
   C.start=ns; C.bd=nb; C.idx=i;
-  if(REC.on) REC.log=REC.log.filter(x=>x.t<=now+eps-REC.t0);
+  if(REC.on) REC.log=REC.log.filter(x=>x.t<=now+eps-REC.t0||x.t+REC.t0<old-eps);
   sched();
 }
 let lastTick=0;
