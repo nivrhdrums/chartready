@@ -132,7 +132,7 @@ async function filmMedia(){
   try{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) throw new Error('no media');
     FILM.stream=await navigator.mediaDevices.getUserMedia({
-      video:S.fmCam?{facingMode:S.fmFacing||'user',width:{ideal:720},height:{ideal:960}}:false,
+      video:S.fmCam?{facingMode:S.fmFacing||'user',width:{ideal:720},height:{ideal:960},frameRate:{ideal:30,min:24}}:false,
       audio:(S.fmRec&&S.fmMic)?{echoCancellation:false,noiseSuppression:false,autoGainControl:false}:false});
     if(!FILM.on){ FILM.stream.getTracks().forEach(t=>t.stop()); FILM.stream=null; return; }
     if(FILM.stream.getVideoTracks().length){ $('fVid').srcObject=FILM.stream; $('fCam').hidden=false; if(S.fmCamPos){ $('fCam').style.left=S.fmCamPos.l; $('fCam').style.top=S.fmCamPos.t; $('fCam').style.bottom='auto'; } try{ await $('fVid').play(); }catch(e){} }

@@ -319,10 +319,14 @@ async function edExport(o){
     const A=ctx.currentTime+P+0.25, srcs=outs.filter(x=>x.buf).map(x=>edSrc(ctx,x.buf,x.dest,0,A-P));
     try{ vb.playbackRate=1; await vb.play(); if(ED.hasCam){ vc.playbackRate=1; await vc.play(); } }catch(e){}
     const c=()=>a+(ctx.currentTime-A);
-    const draw=()=>{ const t=c()-R; edSlave(vb,t,0.3); if(ED.hasCam) edSlave(vc,edCamT(t),0.3); outs.forEach(x=>x.video(x.g,t)); };
+    // draw 30 times a second, not on every screen refresh: drawing every output on every refresh was too much for a phone
+    // and the files came out below 30 fps and jerky
+    let lastD=-1;
+    const draw=(force)=>{ const t=c()-R; edSlave(vb,t,0.3); if(ED.hasCam) edSlave(vc,edCamT(t),0.3);
+      const now=performance.now(); if(!force&&lastD>=0&&now-lastD<31) return; lastD=now; outs.forEach(x=>x.video(x.g,t)); };
     // start every recorder on the same tick, a moment before content time a
     await new Promise(res=>{ const w=()=>{ if(ctx.currentTime>=A-0.03||EDX.cancel) return res(); draw(); requestAnimationFrame(w); }; w(); });
-    draw(); outs.forEach(x=>x.rec.start(500)); st=ctx.currentTime-A;
+    draw(true); outs.forEach(x=>x.rec.start(500)); st=ctx.currentTime-A;
     await new Promise(res=>{ const tick=()=>{ if(!EDX||EDX.cancel) return res();
       const f=clamp((c()-a)/len,0,1); draw(); $('edPct').textContent=Math.round(f*100)+'%'; $('edRing').style.setProperty('--p',f); $('edLeft').textContent=`עוד כ־${Math.max(1,Math.ceil(b-c()))} שניות`;
       if(c()>=b) return res(); requestAnimationFrame(tick); }; tick(); });
