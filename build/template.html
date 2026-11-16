@@ -3759,8 +3759,8 @@ function fitScore(){
   // px per notation unit: the layout that draws the notes bigger wins (1 column, 2 columns, or each bar on two lines)
   const fit=(c,lines,vw)=>{ const rows=Math.ceil(n/c), cw=(W-gap*(c-1))/c, nat=cw*vbH/vw*lines+pad+(lines-1)*4, h=Math.min(nat,(H-gap*(rows-1))/rows); return {c,lines,h,px:Math.min(cw/vw,(h-pad-(lines-1)*4)/(vbH*lines))}; };
   let f=fit(1,1,Ws); if(n>=3){ const f2=fit(2,1,Ws); if(f2.px>f.px*1.05) f=f2; }
-  if(Wh){ const f3=fit(1,2,Wh); if(f3.px>f.px*(LAY.split?1.02:1.2)) f=f3; }
-  const sp=f.lines===2; if(sp!==LAY.split){ LAY.split=sp; relayout(); }
+  // a bar is never split over two lines (Niv, 16.11): one bar = one line
+  if(LAY.split){ LAY.split=false; relayout(); }
   sc.style.gridTemplateColumns=`repeat(${f.c},minmax(0,1fr))`; sc.style.gridAutoRows=`${Math.max(18,f.h).toFixed(2)}px`; // never scroll: every bar is on screen
 }
 new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }catch(e){} }).observe($('score'),{childList:true});

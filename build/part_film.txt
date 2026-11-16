@@ -381,7 +381,7 @@ var HIST={runs:[],pend:[],slot:[],cur:null,sel:new Set(),open:null};
 try{ const h=JSON.parse(localStorage.getItem('cr_hist')||'null'); if(h&&Array.isArray(h.runs)) HIST.runs=h.runs; }catch(e){}
 function histSave(){ try{ localStorage.setItem('cr_hist',JSON.stringify({runs:HIST.runs})); }catch(e){} }
 const histOff=()=>!!((FILM&&FILM.on)||RC.remoteMode||RC.applying);
-const histEntry=(bar,r)=>({b:bar.map(x=>({t:x.t,k:x.k,g:x.g,slots:x.slots.slice()})),s:bar.seed||1,n:r.num,d:r.den,ne:!!bar.noExt,a:bar.acc||null,lv:bar.lv||0,ti:!!bar.ti,to:!!bar.to,p:false});
+const histEntry=(bar,r)=>({b:bar.map(x=>{ const o={t:x.t,k:x.k,g:x.g,slots:x.slots.slice()}; ['mg','me','dot','sh','feel'].forEach(k=>{ if(x[k]) o[k]=x[k]; }); return o; }),s:bar.seed||1,n:r.num,d:r.den,ne:!!bar.noExt,a:bar.acc||null,lv:bar.lv||0,ti:!!bar.ti,to:!!bar.to,p:false});
 const histBar=e=>{ const b=e.b.map(x=>Object.assign({},x,{slots:x.slots.slice()})); b.seed=e.s; if(e.ne) b.noExt=true; if(e.a) b.acc=e.a.slice(); if(e.lv) b.lv=e.lv; if(e.ti) b.ti=true; if(e.to) b.to=true; return b; };
 function histPush(i,bar,r){
   if(histOff()) return;

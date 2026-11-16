@@ -61,7 +61,7 @@ const E8={3:{'100':1,'110':1,'111':2,'101':3,'000':3,'011':6,'010':9,'001':9},2:
 function genGroup(k,den,T){
   if(den===4) return pick(qPool(),T);
   if(modeOf()==='path'){ const L=Math.min(S.level,PATH_MAX), tb=E8[k]||E8[3];
-    if(L>=4&&Math.random()<0.3){ const d=0.35+0.05*Math.min(8,L-4); return {t:'e',k,g:k*2,slots:Array.from({length:k*2},(_,i)=>i===0?Math.random()<0.8:Math.random()<d)}; }
+    if(L>=6&&Math.random()<0.3){ const d=0.35+0.05*Math.min(8,L-6); return {t:'e',k,g:k*2,slots:Array.from({length:k*2},(_,i)=>i===0?Math.random()<0.8:Math.random()<d)}; }
     const c=Object.keys(tb).filter(x=>tb[x]<=L), nw=c.filter(x=>tb[x]===L); const pickC=nw.length&&Math.random()<0.4?nw:c, x=pickC[Math.floor(Math.random()*pickC.length)];
     return {t:'e',k,g:k,slots:[...x].map(ch=>ch==='1')}; }
   const d=density();
@@ -88,12 +88,60 @@ function pickVar(T,lo,used,fam){
    duple scale: 1 quarters/halves/wholes · 2 eighths · 3 eighth on the & · 4 full 16ths · 5 three on the beat · 6 three with syncopation
    7 two on the beat · 8 two without the beat · 9 e alone, a alone, 1-a · 10 syncopation mix · 11 ties in the beat · 12 ties over the beat · 13 ties over the barline
    triplet track runs beside it, sextuplets in five steps (7..11) */
-const PATH_MAX=13;
-const LADDER_D={'4:1000':1,'4:0000':1,'4:1010':2,'4:0010':3,'4:1111':4,'4:1110':5,'4:1011':5,'4:1101':6,'4:0111':6,'4:1100':7,'4:0011':7,'4:0110':8,'4:0101':8,'4:0100':9,'4:0001':9,'4:1001':9};
-const SEXT_ST={'6:111111':7,'6:111100':8,'6:100111':8,'6:111000':8,'6:111110':9,'6:101111':9,'6:111011':9,'6:111010':10,'6:101110':10,'6:101011':10,'6:000111':11,'6:011111':11,'6:001111':11,'6:110111':11,'6:111101':11,'6:110110':11};
-const LADDER_T=Object.assign({'3:111':2,'3:101':4,'3:110':4,'3:011':6,'3:010':9,'3:001':9,'Q:101010':12},SEXT_ST);
-const DESC_D=['רבעים, חצאים ושלמים','שמיניות','שמינית על ה־&','4 שש־עשריות','3 על הפעמה: 16-16-8, 8-16-16','3 עם סינקופה: 16-8-16, הפסקה + 3','2 על הפעמה: 1e, &a','2 בלי הפעמה: e&, e-a','e לבד, a לבד, 1-a','ערבוב סינקופות','קשתות בתוך הפעמה','קשתות מעל הפעמה','קשתות מעל קו התיבה'];
-const DESC_T=['','טריולה מלאה מול שמיניות','מעבר 2↔3 בתוך התיבה','2 מתוך 3 על הפעמה','','פעמה ריקה בטריולה','סקסטולה מלאה','סקסטולות 3+3','1 מתוך 3 · סקסטולות 2+2+2','סקסטולות עם הפסקות','סקסטולות קשות · כתיבה מקוצרת','טריולת רבעים','טריולת חצאים וקשתות'];
+const PATH_MAX=11;
+/* the path (Niv, 15.11.2026, built on drag boards + Rony Holan "Rhythm for All"): every item is written one fixed way, the way charts write it.
+   items longer than a beat are chosen as one unit and start on beat 1 or 3; no ties in the path. */
+const PI=(code,lvl,trk,beats,w)=>({code,lvl,trk,beats,w:w||{}});
+const B4=s=>({t:'q',k:1,g:4,slots:[...s].map(c=>c==='1')});
+const B3=s=>({t:'q',k:1,g:3,slots:[...s].map(c=>c==='1')});
+const B6=s=>({t:'q',k:1,g:6,slots:[...s].map(c=>c==='1')});
+const BL=(k,s)=>({t:'L',k,g:6,slots:[...s].map(c=>c==='1')});
+const PATH_DEF=[
+  // both tracks: notes from 1, rests from 2
+  PI('4:1000',1,'b',[B4('1000')]), PI('M:half',1,'b',[B4('1000'),B4('0000')]), PI('M:whole',1,'b',[B4('1000'),B4('0000'),B4('0000'),B4('0000')]),
+  PI('4:0000',2,'b',[B4('0000')]), PI('M:hrest',2,'b',[B4('0000'),B4('0000')]), PI('M:wrest',2,'b',[B4('0000'),B4('0000'),B4('0000'),B4('0000')]),
+  // squares
+  PI('M:qhq',1,'d',[B4('1000'),B4('1000'),B4('0000'),B4('1000')]),
+  PI('4:1010',3,'d',[B4('1010')]), PI('4:0010',3,'d',[B4('0010')]),
+  PI('M:dq8',4,'d',[B4('1000'),B4('0010')]), PI('M:dhalf',4,'d',[B4('1000'),B4('0000'),B4('0000')]), PI('M:8q8',4,'d',[B4('1010'),B4('0010')]),
+  PI('M:332q',4,'d',[B4('1000'),B4('0010'),B4('0000'),B4('1000')]), PI('M:hit',4,'d',[B4('1000'),B4('1000'),B4('0010'),B4('0000')]),
+  PI('M:8dq',5,'d',[B4('1010'),B4('0000')]), PI('M:r8dq',5,'d',[B4('0010'),B4('0000')]),
+  PI('4:1111',6,'d',[B4('1111')]),
+  PI('4:1110',7,'d',[B4('1110')]), PI('4:1011',7,'d',[B4('1011')]),
+  PI('4:1101',8,'d',[B4('1101')]), PI('4:0111',8,'d',[B4('0111')]),
+  PI('4:0011',9,'d',[B4('0011')]), PI('4:1100.',9,'d',[B4('1100')],{dot:1}), PI('4:1001.',9,'d',[B4('1001')],{dot:1}), PI('M:332s',9,'d',[Object.assign(B4('1001'),{dot:1}),B4('0010')]),
+  PI('4:0001.',10,'d',[B4('0001')],{dot:1}), PI('4:0100.',10,'d',[B4('0100')],{dot:1}),
+  PI('4:0101',11,'d',[B4('0101')]), PI('4:0110',11,'d',[B4('0110')]),
+  // triplets
+  PI('3:111',1,'t',[B3('111')]),
+  PI('Q:101010',2,'t',[BL(2,'101010')]), PI('Q:101000',2,'t',[BL(2,'101000')]), PI('Q:001010',2,'t',[BL(2,'001010')]), PI('Q:100010',2,'t',[BL(2,'100010')]),
+  PI('3:101q',3,'t',[B3('101')],{sh:1}), PI('3:101',3,'t',[B3('101')]), PI('Q:111010',3,'t',[BL(2,'111010')]), PI('Q:101011',3,'t',[BL(2,'101011')]),
+  PI('3:110q',4,'t',[B3('110')],{sh:1}), PI('3:110',4,'t',[B3('110')]), PI('3:001',4,'t',[B3('001')]), PI('Q:101110',4,'t',[BL(2,'101110')]),
+  PI('3:011',5,'t',[B3('011')]), PI('3:010q',5,'t',[B3('010')],{sh:1}), PI('3:010',5,'t',[B3('010')]),
+  PI('Q:110101',6,'t',[BL(2,'110101')]), PI('H:101010',6,'t',[BL(4,'101010')]),
+  PI('6:111111',7,'t',[B6('111111')],{feel:'t'}), PI('6:111111d',7,'t',[B6('111111')],{feel:'d'}),
+  PI('6:100111',8,'t',[B6('100111')]), PI('6:111100',8,'t',[B6('111100')]),
+  PI('6:111000',9,'t',[B6('111000')]), PI('6:000111',9,'t',[B6('000111')]),
+  PI('6:101111',10,'t',[B6('101111')]), PI('6:111011',10,'t',[B6('111011')]), PI('6:111110',10,'t',[B6('111110')]),
+  PI('6:101011',11,'t',[B6('101011')]), PI('6:101110',11,'t',[B6('101110')]), PI('6:111010',11,'t',[B6('111010')])
+];
+// plain-code levels (used by manual mode and the rhythm map)
+const LADDER_D={}, LADDER_T={};
+PATH_DEF.forEach(p=>{ if(p.beats.length!==1) return; const c=p.code.replace(/[.qd]$/,''); const T=p.trk==='t'?LADDER_T:LADDER_D; if(T[c]==null||p.lvl<T[c]) T[c]=p.lvl; });
+const SEXT_ST={}; Object.keys(LADDER_T).forEach(c=>{ if(c[0]==='6') SEXT_ST[c]=LADDER_T[c]; });
+let PITEMS=null;
+function pathItems(){
+  if(PITEMS) return PITEMS;
+  return PITEMS=PATH_DEF.map(d=>{
+    const beats=d.beats.map((b,j)=>Object.assign({},b,j===0?d.w:{}));
+    const k=beats.reduce((a,b)=>a+b.k,0);
+    const synB=b=>b.t==='L'?(b.slots.join()===[1,0,1,0,1,0].map(Boolean).join()?0.5:b.slots[0]?1:2):synOf(beatCode(b));
+    const syn=Math.max(...beats.map(synB));
+    return {code:d.code,lvl:d.lvl,trk:d.trk,beats,bt:beats[0],k,syn,ok:true,rest:!beats.some(b=>b.slots.some(Boolean))};
+  });
+}
+const DESC_D=['רבעים, חצאים ושלמים · רבע־חצי־רבע','הפסקות: רבע, חצי, שלמה','שמיניות · שמינית על ה־&','נקודות: רבע מנוקד, חצי מנוקד · 8־רבע־8 · 3+3+2','8 + רבע מנוקד · הפסקה + רבע מנוקד','4 שש־עשריות','3 על הפעמה: 16-16-8, 8-16-16','16-8-16 · הפסקה + 3','8־16־16 בלי הפעמה, שמינית מנוקדת · 3+3+2 ב־16','הפסקה מנוקדת + 16 · הפסקה + שמינית מנוקדת','e&a בלי הפעמה: 0101, 0110'];
+const DESC_T=['טריולה מלאה','טריולת רבעים','101 · טריולת רבעים עם זוג שמיניות','110 · 001 · זוג שמיניות באמצע','011 · 010','8־רבע־רבע־8 · טריולת חצאים','סקסטולה מלאה (6, 3+3)','סקסטולות 3+3 עם שמינית','סקסטולות 3+3 עם הפסקה','סקסטולות 2+2+2 עם שני זוגות','סקסטולות 2+2+2 עם זוג אחד'];
 const LMAX=()=>(S.mode||'free')==='path'?PATH_MAX:10;
 // syncopation of one beat (Longuet-Higgins & Lee): a note followed by silence on a stronger spot; a missing downbeat counts too
 const MW={1:[0],2:[0,-1],3:[0,-2,-2],4:[0,-2,-1,-2],6:[0,-3,-2,-1,-2,-3]};
@@ -115,7 +163,7 @@ function allPatterns(){
   // sextuplets that stay in the app are split into three steps by difficulty
   list.forEach(p=>{
     const c=p.code; p.trk=c==='4:1000'||c==='4:0000'?'b':c[0]==='4'?'d':'t'; // quarters belong to both tracks
-    p.lvl=LVL_EDIT[c]!=null?LVL_EDIT[c]:LADDER_D[c]||LADDER_T[c]||((c[0]==='Q'||c[0]==='H')&&!EXCL.has(c)?13:0); p.syn=synOf(c);
+    p.lvl=LVL_EDIT[c]!=null?LVL_EDIT[c]:LADDER_D[c]||LADDER_T[c]||((c[0]==='Q'||c[0]==='H')&&!EXCL.has(c)?11:0); p.syn=synOf(c);
     p.ok=c==='Q:101010'||!EXCL.has(c)||!!LVL_EDIT[c];
   });
   return ALLP=list;
@@ -126,16 +174,17 @@ function poolNow(){
   const all=allPatterns();
   if(modeOf()==='manual'){ const on=new Set(S.manual||[]); let pl=all.filter(p=>on.has(p.code)); if(!pl.length) pl=all.filter(p=>p.code==='4:1000'); return pl.map(p=>({p,w:1})); }
   const L=Math.min(S.level,PATH_MAX), dOn=S.trkD!==false, tOn=!!S.trkT||!dOn, cap=synCap();
-  const pl=all.filter(p=>p.ok&&p.lvl&&p.lvl<=L&&(p.trk==='b'||(p.trk==='d'?dOn:tOn)));
+  const pl=pathItems().filter(p=>p.lvl<=L&&(p.trk==='b'||(p.trk==='d'?dOn:tOn)));
   const nw=pl.filter(p=>p.lvl===L).length, od=pl.length-nw;
-  return pl.map(p=>{ let w=nw&&od?(p.lvl===L?0.4/nw:0.6/od):1/pl.length; if(p.code==='4:0000') w*=0.5; if(p.k>1) w*=0.25;
-    if(p.syn>cap) w*=Math.exp(-(p.syn-cap)*1.3); if(L===10&&p.syn>=1) w*=1.8; return {p,w}; });
+  return pl.map(p=>{ let w=nw&&od?(p.lvl===L?0.4/nw:0.6/od):1/pl.length; if(p.rest) w*=0.5; if(p.k>1) w*=p.k>2?0.3:0.5;
+    if(p.syn>cap) w*=Math.exp(-(p.syn-cap)*1.3); return {p,w}; });
 }
 // the syncopation ceiling inside a level: starts at strong full beats, opens up over the first rhythms of the level
 const SYN={lvl:0,n:0};
 function synCap(){ return SYN.lvl!==S.level?0:Math.min(6,0.4+SYN.n*0.6); }
 function synStep(){ if(SYN.lvl!==S.level){ SYN.lvl=S.level; SYN.n=0; } else SYN.n++; }
 function drawW(items){ let s=items.reduce((a,b)=>a+b.w,0), r=Math.random()*s; for(const it of items){ r-=it.w; if(r<=0) return it.p; } return items[items.length-1].p; }
+let MGN=0;
 function genLadderBar(fam){
   let pool=poolNow(); if(fam){ const f=pool.filter(x=>x.p.trk==='b'||(x.p.trk==='d')===(fam==='d')); if(f.length) pool=f; }
   const q=pool.filter(x=>x.p.k===1), used=new Set(), gr=[]; let i=0;
@@ -148,13 +197,18 @@ function genLadderBar(fam){
     if(p&&p.k===1&&used.has(p.code)){ const fresh=q.filter(x=>!used.has(x.p.code)); if(fresh.length) p=drawW(fresh); }
     if(!p){ p=drawW(q.length?q:pool.filter(x=>x.p.k===1)); }
     if(!p){ gr.push({t:'q',k:1,g:1,slots:[true]}); i++; continue; }
-    used.add(p.code); gr.push(Object.assign({},p.bt,{slots:p.bt.slots.slice()})); i+=p.k;
+    used.add(p.code);
+    // an item longer than a beat goes in as one unit (mg = its id, me = the tick where it ends) so it is written as one shape
+    const bs=p.beats||[p.bt], id=bs.length>1?++MGN:0;
+    bs.forEach(b=>{ const o=Object.assign({},b,{slots:b.slots.slice()}); if(id){ o.mg=id; o.me=(i+p.k)*12; } gr.push(o); });
+    i+=p.k;
   }
   if(modeOf()==='path'){ gr.lv=Math.min(S.level,PATH_MAX);
-    // both tracks from level 3: a bar holds both feels (2 and 3 side by side)
+    // both tracks chosen: from level 1 a bar holds both feels (2 and 3 side by side)
     const dOn=S.trkD!==false, tOn=!!S.trkT||!dOn;
-    if(!fam&&dOn&&tOn&&S.level>=3&&gr.length>=2&&gr.every(x=>x.t==='q')){ const fams=new Set(gr.map(famOf));
-      if(fams.size===1){ const need=fams.has('b')?'t':'b', cand=q.filter(x=>famOf(x.p.bt)===need); if(cand.length){ const j=1+Math.floor(Math.random()*(gr.length-1)), p=drawW(cand); gr[j]=Object.assign({},p.bt,{slots:p.bt.slots.slice()}); } } } }
+    if(!fam&&dOn&&tOn&&gr.length>=2&&gr.every(x=>x.t==='q')){ const fams=new Set(gr.map(famOf));
+      const free=gr.map((x,j)=>j>0&&!x.mg?j:-1).filter(j=>j>0);
+      if(fams.size===1&&free.length){ const need=fams.has('b')?'t':'b', cand=q.filter(x=>famOf(x.p.bt)===need); if(cand.length){ const j=free[Math.floor(Math.random()*free.length)], p=drawW(cand); gr[j]=Object.assign({},p.bt,{slots:p.bt.slots.slice()}); } } } }
   return gr;
 }
 function genRhythm(){
@@ -163,11 +217,13 @@ function genRhythm(){
   const only=![1,2,4,3,6].some(g=>S.grids[g]);
   const hasB=S.grids[2]||S.grids[4], hasT=S.grids[3]||S.grids[6]||S.grids.L;
   let lastCode='';
-  const path=modeOf()==='path', twoT=path&&S.trkD!==false&&!!S.trkT&&S.level===2;
+  const path=modeOf()==='path';
+  if(path&&S.level>PATH_MAX) S.level=PATH_MAX; // the path went from 13 to 11 levels
   if(path) synStep();
   for(let b=0;b<S.bars;b++){
     let gr=[];
-    if(S.den===4&&modeOf()!=='free'){ gr=genLadderBar(twoT?(b%2?'t':'d'):null); }
+    // a path bar is never left empty: draw again rather than poke a note into a shape
+    if(S.den===4&&modeOf()!=='free'){ for(let t=0;t<12;t++){ gr=genLadderBar(null); if(gr.some(x=>x.slots.some(Boolean))) break; } }
     else if(S.den===4){
       const used=new Set(); if(lastCode) used.add(lastCode);
       let i=0;
@@ -190,9 +246,9 @@ function genRhythm(){
     if(!gr.some(x=>x.slots.some(Boolean))){ const x=gr[Math.floor(Math.random()*gr.length)]; x.slots[0]=true; }
     gr.seed=1+Math.floor(Math.random()*2e9);
     if(path&&!gr.lv) gr.lv=Math.min(S.level,PATH_MAX);
-    // level 13: now and then the last note of a bar is tied into the next bar
+    // ties over the barline are out of the path for now (Niv, 15.11)
     const pv=bars[b-1];
-    if(path&&S.den===4&&S.level>=13&&pv&&Math.random()<0.4){ const lb=pv[pv.length-1], fb=gr[0];
+    if(false&&pv){ const lb=pv[pv.length-1], fb=gr[0];
       if(lb&&lb.t==='q'&&lb.slots[lb.g-1]&&fb&&fb.t==='q'&&[1,2,4,3].includes(fb.g)&&gr.some((x,j)=>j>0&&x.slots.some(Boolean))){ fb.slots=fb.slots.slice(); fb.slots[0]=false; gr.ti=true; pv.to=true; } }
     if(S.dynOn) gr.acc=pickAccents(gr,S.den,dynStage());
     bars.push(gr);
