@@ -434,6 +434,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
     </div>
     <button class="mclock dim" id="clockPill" data-pop="clock"><svg class="drain" preserveAspectRatio="none" viewBox="0 0 200 56"><rect class="dr0" x="1.5" y="1.5" width="197" height="53" rx="26.5" pathLength="100"/><rect class="dr1" id="clockDrain" x="1.5" y="1.5" width="197" height="53" rx="26.5" pathLength="100"/></svg><b id="clockPillT">0:00</b><small id="clockPillL">⏱ שעון</small></button>
     <div class="gapb" id="gapBadge" hidden></div>
+    <button class="pyopen" id="pyOpen"><i>4:3</i> שכבות · פוליריתמיקה</button>
   </section>
 
   <!-- trainer -->
@@ -3758,6 +3759,7 @@ $('play').onclick=toggle;
 $('newBtn').onclick=()=>requestNew();
 // keyboard: space play/stop, N new, arrows tempo (shift = 5), 1-4 tabs
 document.addEventListener('keydown',e=>{ if(FILM.on){ filmKey(e); return; }
+  if(PY.on){ pyKey(e); return; }
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||e.ctrlKey||e.metaKey||e.altKey) return;
   if($('sheet').classList.contains('open')||$('pop').classList.contains('open')||!$('cfWrap').hidden) return;
   const k=e.key;
@@ -3788,6 +3790,7 @@ new MutationObserver(()=>{ fitScore(); try{ if(RCS.role==='host') hostDirty(); }
 window.addEventListener('resize',fitScore);
 setBpm(S.bpm); buildCols(); setTab(S.tab);
 rhythm=genRhythm(); render();
+{{POLY}}
 {{REMOTE}}
 })();
 </script>

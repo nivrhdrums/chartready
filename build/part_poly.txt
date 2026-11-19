@@ -1,0 +1,261 @@
+// ===== שכבות (פוליריתמיקה רב־שכבתית): קליק / פולס חדש / חלוקה של הפולס =====
+const PY_DEF={bpm:90,P:4,C:3,n:2,lay:{c:1,p:1,s:1},cnt:'c',pb:4,pm:'both',subs:[1,2,3,4],tStep:0,tMax:120};
+const PY={on:false,view:'main',play:false,progOn:false,timer:0,nodes:[],q:[],bars:[],nextT:0,barI:0,g:null,raf:0,shown:-1,lanesN:-1,bus:null,wake:null,sheet:null};
+const PY_SUBS=[[0.5,'חצאים'],[1,'רבעים'],[2,'שמיניות'],[3,'טריולות'],[4,'שש־עשריות'],[5,'קווינטולות'],[6,'סקסטולות']];
+const PY_SHORT={0.5:'חצאים',1:'רבעים',2:'שמיניות',3:'טריולות',4:'שש־עשריות',5:'קווינטולות',6:'סקסטולות'};
+const PY_RAT=[[4,3],[3,2],[2,3],[3,4],[5,4],[5,3],[4,5],[7,4]];
+const PY_STG=[{L:{c:1,p:1,s:1},t:'הכל דולק',d:'קליק + פולס + חלוקה'},{L:{c:1,p:1,s:0},t:'בלי חלוקה',d:'מנגנים את החלוקה לבד'},{L:{c:1,p:.3,s:0},t:'פולס חלש',d:'הפולס בשקט, בקושי שומעים'},{L:{c:1,p:0,s:0},t:'רק הקליק',d:'המבחן האמיתי'}];
+const PY_PM={layers:'שכבות נעלמות',subs:'חלוקות מתחלפות',both:'שניהם'};
+function pyS(){ if(!S.py||typeof S.py!=='object') S.py={}; const o=S.py; for(const k in PY_DEF) if(o[k]===undefined||o[k]===null) o[k]=JSON.parse(JSON.stringify(PY_DEF[k])); if(!pySubOk(o.n,o.P)) o.n=1; return o; }
+const pySubOk=(n,P)=>n>=1||P%2===0;
+const pyN=(n,P)=>Math.round(P*n);
+const pyPulseBpm=o=>Math.round(o.bpm*o.P/o.C*10)/10;
+const pyFmt=v=>String(Math.round(v*10)/10);
+function pySubsList(){ const o=pyS(); const L=PY_SUBS.map(x=>x[0]).filter(n=>o.subs.includes(n)&&pySubOk(n,o.P)); return L.length?L:[o.n]; }
+
+// ---------- צלילים ----------
+function pyOut(){ if(!PY.bus){ PY.bus=ctx.createGain(); PY.bus.gain.value=1; PY.bus.connect(master); } return PY.bus; }
+function pyKeep(n){ PY.nodes.push(n); if(PY.nodes.length>400) PY.nodes.splice(0,200); }
+function pyBell(t,v){ // קאובל לפולס
+  const f=ctx.createBiquadFilter(), g=ctx.createGain(); f.type='bandpass'; f.frequency.value=800; f.Q.value=1.1;
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.55*v,t+0.002); g.gain.exponentialRampToValueAtTime(0.0001,t+0.17);
+  f.connect(g).connect(pyOut());
+  for(const fr of [562,836]){ const o=ctx.createOscillator(); o.type='square'; o.frequency.value=fr; o.connect(f); o.start(t); o.stop(t+0.19); pyKeep(o); }
+}
+function pyRim(t,v){ // רימשוט עדין לחלוקה
+  const n=ctx.createBufferSource(); n.buffer=noiseBuf; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=3200; f.Q.value=3;
+  const g=ctx.createGain(); g.gain.setValueAtTime(0.42*v,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.03);
+  n.connect(f).connect(g).connect(pyOut()); n.start(t); n.stop(t+0.05); pyKeep(n);
+  const o=ctx.createOscillator(), og=ctx.createGain(); o.type='triangle'; o.frequency.value=1750;
+  og.gain.setValueAtTime(0.0001,t); og.gain.exponentialRampToValueAtTime(0.14*v,t+0.001); og.gain.exponentialRampToValueAtTime(0.0001,t+0.025);
+  o.connect(og).connect(pyOut()); o.start(t); o.stop(t+0.04); pyKeep(o);
+}
+function pyClick(t,acc){ const was=SCHED, n0=TRK.length; SCHED=true; try{ click(t,acc?'acc':'beat'); } finally{ SCHED=was; } const add=TRK.splice(n0); add.forEach(x=>pyKeep(x.n)); }
+
+// ---------- תזמון ----------
+function pyNextInfo(){ // מה מתנגן בתיבה הבאה, ואז מתקדמים
+  const o=pyS(), G=PY.g;
+  if(!G.prog) return {prog:false,n:o.n,bpm:o.bpm};
+  const subs=pySubsList(), pm=o.pm;
+  const n=pm==='layers'?o.n:subs[G.si%subs.length];
+  const stg=pm==='subs'?-1:G.stg;
+  const L=pm==='subs'?{c:1,p:1,s:1}:PY_STG[G.stg].L;
+  const segs=pm==='both'?4*subs.length:pm==='layers'?4:subs.length;
+  const seg=pm==='both'?G.si*4+G.stg:pm==='layers'?G.stg:G.si;
+  const left=o.pb-G.bar;
+  let next;
+  if(pm==='subs') next=PY_SUBS.find(x=>x[0]===subs[(G.si+1)%subs.length])[1];
+  else if(G.stg<3) next=PY_STG[G.stg+1].t;
+  else if(pm==='both') next=PY_SUBS.find(x=>x[0]===subs[(G.si+1)%subs.length])[1]+' · הכל דולק';
+  else next='מההתחלה';
+  const info={prog:true,n,bpm:G.bpm,L,stg,seg,segs,left,next,frac:G.bar/o.pb};
+  // התקדמות
+  const round=()=>{ if(o.tStep>0) G.bpm=Math.min(Math.max(o.tMax,o.bpm),G.bpm+o.tStep); };
+  G.bar++;
+  if(G.bar>=o.pb){ G.bar=0;
+    if(pm==='subs'){ G.si++; if(G.si>=subs.length){ G.si=0; round(); } }
+    else { G.stg++; if(G.stg>=4){ G.stg=0; if(pm==='both'){ G.si++; if(G.si>=subs.length){ G.si=0; round(); } } else round(); } }
+  }
+  return info;
+}
+function pyBar(t0){
+  const o=pyS(), st=pyNextInfo(), dur=o.C*60/st.bpm, N=pyN(st.n,o.P), b=PY.barI++;
+  const ev=[];
+  for(let i=0;i<o.C;i++) ev.push({t:t0+dur*i/o.C,k:'c',i,st});
+  for(let i=0;i<o.P;i++) ev.push({t:t0+dur*i/o.P,k:'p',i,st});
+  for(let i=0;i<N;i++) ev.push({t:t0+dur*i/N,k:'s',i,st});
+  ev.sort((a,b)=>a.t-b.t); PY.q.push(...ev);
+  PY.bars.push({t0,dur,i:b,st,P:o.P,C:o.C,N}); if(PY.bars.length>6) PY.bars.shift();
+  return dur;
+}
+function pyGain(e){ const o=pyS(); return e.st.prog?e.st.L[e.k]:(o.lay[e.k]?1:0); }
+function pySound(e){ const g=pyGain(e); if(!g) return;
+  if(e.k==='c') pyClick(e.t,e.i===0);
+  else if(e.k==='p') pyBell(e.t,g*(e.i===0?1:0.8));
+  else pyRim(e.t,g*(e.i===0?1:0.85));
+}
+function pyTick(){ if(!PY.play||!ctx) return; const now=ctx.currentTime;
+  let guard=0; while(PY.nextT<now+0.35&&guard++<4) PY.nextT+=pyBar(PY.nextT);
+  while(PY.q.length&&PY.q[0].t<now+0.12){ const e=PY.q.shift(); if(e.t<now-0.03) continue; pySound(e); }
+}
+async function pyStart(prog){
+  if(typeof playing!=='undefined'&&playing) stop();
+  await initAudio(); if(typeof applyVol==='function') applyVol();
+  const o=pyS();
+  PY.progOn=!!prog; PY.q=[]; PY.bars=[]; PY.barI=0; PY.shown=-1;
+  PY.g={prog:PY.progOn,stg:0,si:0,bar:0,bpm:o.bpm};
+  PY.nextT=ctx.currentTime+0.15; PY.play=true;
+  clearInterval(PY.timer); PY.timer=setInterval(pyTick,25); pyTick();
+  try{ if(navigator.wakeLock) PY.wake=await navigator.wakeLock.request('screen'); }catch(e){}
+  pyRender();
+}
+function pyStop(){
+  PY.play=false; clearInterval(PY.timer); PY.timer=0; PY.q=[];
+  const t=ctx?ctx.currentTime:0; PY.nodes.forEach(n=>{ try{ n.stop(t); }catch(e){} }); PY.nodes=[];
+  try{ PY.wake&&PY.wake.release(); }catch(e){} PY.wake=null;
+  pyRender();
+}
+const pyToggle=()=>PY.play?pyStop():pyStart(PY.view==='prog');
+
+// ---------- מבנה המסך ----------
+const PY_HTML=`
+<div class="pyin">
+  <div class="pyh"><button class="pyx" id="pyX" aria-label="חזרה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button><b id="pyTitle">שכבות</b><button class="pypill" id="pyRatT"></button></div>
+  <div class="pyview" id="pyMain">
+    <div class="pytempo" dir="ltr">
+      <div class="pyt"><button class="pyadj" data-d="-1" aria-label="הורד טמפו">−</button><button class="pynum" id="pyBC" aria-label="הקלד טמפו"></button><button class="pyadj" data-d="1" aria-label="העלה טמפו">+</button><small>קליק</small></div>
+      <span class="pyeq" dir="ltr" id="pyEq"></span>
+      <div class="pyt"><span class="pynum o" id="pyBP"></span><small>פולס חדש</small></div>
+    </div>
+    <div class="pylanehome" id="pyLaneHome"></div>
+    <div class="pynote" id="pyNote"></div>
+    <div class="pychips" id="pySubs"></div>
+    <div class="pytiles">
+      <button class="pytile" data-py="rat"><small>יחס</small><b id="pyQR"></b><span class="pys2">פולס : קליק</span></button>
+      <button class="pytile" data-py="meter"><small>משקל</small><b id="pyQM"></b><span class="pys2">של הקליק</span></button>
+      <button class="pytile" data-py="cnt"><small>ספירה</small><b id="pyQC" dir="ltr"></b><span class="pys2" id="pyQC2"></span></button>
+      <button class="pytile" data-py="prog"><small>הדרגה</small><b id="pyQP"></b><span class="pys2">תוכנית</span></button>
+    </div>
+  </div>
+  <div class="pyview" id="pyProg" hidden>
+    <div class="pyseg" id="pyPm"></div>
+    <div class="pycard" id="pyStgCard"><div class="pych"><b>שכבות</b><span class="pypb">כל שלב <button class="pyadj sm" data-pb="-1">−</button><i id="pyPbV"></i><button class="pyadj sm" data-pb="1">+</button> תיבות</span></div><div id="pyStgs"></div></div>
+    <div class="pycard" id="pySubCard"><div class="pych"><b>חלוקות</b><span>לפי הסדר · לוחצים להוסיף/להוריד</span></div><div class="pylad" id="pyLad" dir="ltr"></div></div>
+    <div class="pycard"><div class="pych"><b>טמפו</b><span>אחרי כל סבב</span></div><div class="pylad" id="pyTs" dir="ltr"></div></div>
+  </div>
+  <div class="pyview pyplayv" id="pyPlay" hidden>
+    <div class="pybig"><div class="a" id="pyPName"></div><div class="b" id="pyPSub"></div></div>
+    <div class="pylab">פולס חדש · <span id="pyPB"></span></div>
+    <div class="pypulses" id="pyPulses" dir="ltr"></div>
+    <div class="pylab">קליק · <span id="pyCB"></span></div>
+    <div class="pyclicks" id="pyClicks" dir="ltr"></div>
+    <div id="pyLanePlay"></div>
+    <div class="pynext" id="pyNext" hidden></div>
+    <div class="pyprg" id="pyPrg" dir="ltr" hidden></div>
+  </div>
+  <div class="pyfoot"><button class="big" id="pyGo"></button></div>
+</div>
+<div class="pysheet" id="pySheet" hidden><div class="pysc"><div class="pophead"><h3 id="pyShT"></h3><button class="done" id="pyShX">סיום</button></div><div id="pyShB"></div></div></div>`;
+
+function pyInit(){ if($('py')) return;
+  const d=document.createElement('div'); d.className='py'; d.id='py'; d.dir='rtl'; d.hidden=true; d.innerHTML=PY_HTML; document.body.appendChild(d);
+  const L=document.createElement('div'); L.className='pylanes'; L.id='pyLanes'; L.dir='ltr'; $('pyLaneHome').appendChild(L);
+  $('pyX').onclick=()=>{ if(PY.view==='prog'&&!PY.play){ PY.view='main'; pyRender(); } else pyClose(); };
+  $('pyGo').onclick=pyToggle;
+  $('pyRatT').onclick=()=>pySheet('rat');
+  $('pyBC').onclick=()=>openKeypad({title:'טמפו קליק',value:pyS().bpm,min:20,max:300,unit:'BPM',onOk:v=>pySetBpm(v)});
+  d.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>pySetBpm(pyS().bpm+(+b.dataset.d)));
+  d.querySelectorAll('[data-pb]').forEach(b=>b.onclick=()=>{ const o=pyS(); o.pb=clamp(o.pb+(+b.dataset.pb),1,16); save(); pyRender(); });
+  d.querySelectorAll('[data-py]').forEach(b=>b.onclick=()=>{ const k=b.dataset.py, o=pyS();
+    if(k==='rat'||k==='meter') pySheet('rat');
+    else if(k==='cnt'){ o.cnt=o.cnt==='c'?'p':'c'; save(); PY.lanesN=-1; pyRender(); }
+    else if(k==='prog'){ PY.view='prog'; pyRender(); } });
+  $('pyShX').onclick=()=>{ $('pySheet').hidden=true; };
+  $('pySheet').onclick=e=>{ if(e.target.id==='pySheet') $('pySheet').hidden=true; };
+}
+function pySetBpm(v){ const o=pyS(); o.bpm=clamp(Math.round(v),20,300); if(PY.play&&PY.g&&!PY.g.prog) PY.g.bpm=o.bpm; save(); pyRender(); }
+function pyOpen(){ pyInit(); if(typeof playing!=='undefined'&&playing) stop(); PY.on=true; PY.view='main'; PY.lanesN=-1; $('py').hidden=false; pyRender(); cancelAnimationFrame(PY.raf); PY.raf=requestAnimationFrame(pyFrame); }
+function pyClose(){ if(PY.play) pyStop(); PY.on=false; $('py').hidden=true; $('pySheet').hidden=true; cancelAnimationFrame(PY.raf); }
+function pySheet(k){ const o=pyS();
+  $('pyShT').textContent='יחס';
+  $('pyShB').innerHTML=`<div class="pyrats">${PY_RAT.map(([P,C])=>`<button class="pyrat" data-p="${P}" data-c="${C}" aria-pressed="${o.P===P&&o.C===C}"><b>${P} על ${C}</b><small>${P} פולסים על ${C} קליקים · ${C}/4</small></button>`).join('')}</div><div class="hint">המספר הראשון: כמה פולסים חדשים בתיבה. השני: כמה קליקים (רבעים) בתיבה.</div>`;
+  $('pyShB').querySelectorAll('.pyrat').forEach(b=>b.onclick=()=>{ if(PY.play) pyStop(); o.P=+b.dataset.p; o.C=+b.dataset.c; if(!pySubOk(o.n,o.P)) o.n=1; save(); PY.lanesN=-1; $('pySheet').hidden=true; pyRender(); });
+  $('pySheet').hidden=false;
+}
+
+// ---------- ציור ----------
+function pyNoteHtml(n){ const o=pyS(), N=pyN(n,o.P), C=o.C, g=C*4, nm=PY_SUBS.find(x=>x[0]===n)[1];
+  let on=0; for(let i=0;i<N;i++){ const x=i*g/N; if(Math.abs(x-Math.round(x))<1e-6) on++; }
+  const head=`<b>${nm} על הפולס = ${N} על ${C}.</b> `;
+  const PER={1:'רבעים',2:'שמיניות',3:'טריולות',4:'שש־עשריות',6:'סקסטולות',8:'32־יות'};
+  if(N%C===0) return head+`<span class="ok">✓ חוזר לגריד:</span> בדיוק ${PER[N/C]||(N/C+' בכל קליק')} של הקליק.`;
+  const sp=g/N, WR={3:'שמיניות מנוקדות',6:'רבעים מנוקדים',1.5:'שש־עשריות מנוקדות',12:'חצאים מנוקדים'};
+  const wr=WR[Math.round(sp*100)/100]?` (בכתיבה: ${WR[Math.round(sp*100)/100]})`:'';
+  if(on===N) return head+`כל הצלילים על השש־עשריות של הקליק${wr}.`;
+  if(on===1) return head+`חוץ מה־1, כל הצלילים נופלים בין השש־עשריות של הקליק.`;
+  return head+`רק ${on} מתוך ${N} נופלים על השש־עשריות של הקליק, השאר באמצע${wr}.`;
+}
+const pyX=(i,cnt)=>(3+94*i/cnt);
+function pyLanesBuild(n){ const o=pyS(), N=pyN(n,o.P), el=$('pyLanes');
+  const row=(k,nm,cnt)=>`<div class="pyl" data-k="${k}"><div class="pytr">${[...Array(cnt)].map((_,i)=>`<i style="left:${pyX(i,cnt)}%"${i?'':' class="f"'}></i>`).join('')}</div><button class="pyln" data-lay="${k}">${nm}<span class="tg"></span></button></div>`;
+  let lab='';
+  if(o.cnt==='c'){ const g=o.C*4, s=['','e','&','a']; for(let j=0;j<g;j++) lab+=`<span class="${j%4?'':'b'}" style="left:${pyX(j,g)}%">${j%4?s[j%4]:(j/4+1)}</span>`; }
+  else { const per=n>=1?n:0; if(per>=1){ const s=per===2?['','&']:per===4?['','e','&','a']:null; for(let j=0;j<N;j++){ const p=j%per; lab+=`<span class="${p?'':'b'}" style="left:${pyX(j,N)}%">${p?(s?s[p]:'·'):(j/per+1)}</span>`; } } else for(let j=0;j<o.P;j++) lab+=`<span class="b" style="left:${pyX(j,o.P)}%">${j+1}</span>`; }
+  el.innerHTML=row('c','קליק',o.C)+row('p','פולס',o.P)+row('s','חלוקה',N)+`<div class="pyg"><div class="pygl">${lab}</div><span class="pyls"></span></div><div class="pyhd" id="pyHd"></div>`;
+  el.querySelectorAll('[data-lay]').forEach(b=>b.onclick=()=>{ if(PY.play&&PY.progOn) return; const k=b.dataset.lay; o.lay[k]=o.lay[k]?0:1; save(); pyLaneState(); });
+  PY.marks={c:[...el.querySelectorAll('[data-k="c"] i')],p:[...el.querySelectorAll('[data-k="p"] i')],s:[...el.querySelectorAll('[data-k="s"] i')]};
+  PY.lanesN=n+':'+o.P+':'+o.C+':'+o.cnt; pyLaneState();
+}
+function pyLaneState(L){ const o=pyS(); const el=$('pyLanes'); if(!el) return;
+  L=L||(PY.play&&PY.progOn&&PY.curSt?PY.curSt.L:{c:o.lay.c,p:o.lay.p,s:o.lay.s});
+  el.querySelectorAll('.pyl').forEach(r=>{ const v=L[r.dataset.k]; r.classList.toggle('off',!v); r.classList.toggle('dim',v>0&&v<1); });
+  el.classList.toggle('locked',PY.play&&PY.progOn);
+}
+function pyRender(){ if(!$('py')) return; const o=pyS(), playV=PY.play;
+  $('pyMain').hidden=playV||PY.view!=='main'; $('pyProg').hidden=playV||PY.view!=='prog'; $('pyPlay').hidden=!playV;
+  $('py').classList.toggle('playing',playV);
+  $('pyTitle').textContent=PY.view==='prog'&&!playV?'הדרגה':'שכבות';
+  $('pyRatT').textContent=`${o.P} על ${o.C}`;
+  $('pyBC').textContent=o.bpm; $('pyBP').textContent=pyFmt(pyPulseBpm(o)); $('pyEq').textContent=`× ${o.P}/${o.C} =`;
+  const n=o.n;
+  $('pyNote').innerHTML=pyNoteHtml(n);
+  $('pySubs').innerHTML=PY_SUBS.filter(([v])=>pySubOk(v,o.P)).map(([v,nm])=>{ const N=pyN(v,o.P); return `<button class="pychip${N%o.C===0?' grid1':''}" data-n="${v}" aria-pressed="${v===n}"><b><bdi>${PY_SHORT[v]}</bdi></b><small dir="ltr">${N}:${o.C}${N%o.C===0?' ✓':''}</small></button>`; }).join('');
+  $('pySubs').querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{ o.n=+b.dataset.n; save(); pyRender(); });
+  $('pyQR').textContent=`${o.P}:${o.C}`; $('pyQM').textContent=`${o.C}/4`;
+  $('pyQC').textContent=o.cnt==='c'?'1 e & a':'1 2 3 4'.split(' ').slice(0,Math.min(4,o.P)).join(' '); $('pyQC2').textContent=o.cnt==='c'?'לפי הקליק':'לפי הפולס';
+  $('pyQP').textContent=PY_PM[o.pm];
+  // הדרגה
+  $('pyPm').innerHTML=Object.entries(PY_PM).map(([k,v])=>`<button data-pm="${k}" aria-pressed="${o.pm===k}">${v}</button>`).join('');
+  $('pyPm').querySelectorAll('[data-pm]').forEach(b=>b.onclick=()=>{ o.pm=b.dataset.pm; save(); pyRender(); });
+  $('pyStgCard').hidden=o.pm==='subs'; $('pySubCard').hidden=o.pm==='layers'; $('pyPbV').textContent=o.pb;
+  const dots=L=>['c','p','s'].map(k=>`<i class="pyd ${k}${!L[k]?' x':L[k]<1?' h':''}">${{c:'ק',p:'פ',s:'ח'}[k]}</i>`).join('');
+  $('pyStgs').innerHTML=PY_STG.map((s,i)=>`<div class="pyrow"><span class="pynm">${i+1}</span><div class="pytx">${s.t}<small>${s.d}</small></div><div class="pydots" dir="ltr">${dots(s.L)}</div></div>`).join('')+`<div class="pyrow mut"><span class="pynm">↺</span><div class="pytx">${o.pm==='both'?'אחרי שלב 4: החלוקה הבאה ברשימה':'אחרי שלב 4: חוזרים לשלב 1'}</div></div>`;
+  $('pyLad').innerHTML=PY_SUBS.filter(([v])=>pySubOk(v,o.P)).map(([v])=>`<button data-sub="${v}" aria-pressed="${o.subs.includes(v)}"><bdi>${PY_SHORT[v]}</bdi> <small>${pyN(v,o.P)}</small></button>`).join('');
+  $('pyLad').querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{ const v=+b.dataset.sub, i=o.subs.indexOf(v); if(i>=0){ if(o.subs.length>1) o.subs.splice(i,1); } else o.subs.push(v); save(); pyRender(); });
+  $('pyTs').innerHTML=[0,2,4,5,10].map(v=>`<button data-ts="${v}" aria-pressed="${o.tStep===v}">${v?'+'+v:'כבוי'}</button>`).join('')+(o.tStep?`<button class="pymax" id="pyMax">עד ${o.tMax}</button>`:'');
+  $('pyTs').querySelectorAll('[data-ts]').forEach(b=>b.onclick=()=>{ o.tStep=+b.dataset.ts; save(); pyRender(); });
+  if($('pyMax')) $('pyMax').onclick=()=>openKeypad({title:'טמפו מקסימלי',value:o.tMax,min:20,max:300,unit:'BPM',onOk:v=>{ o.tMax=v; save(); pyRender(); }});
+  // כפתור
+  $('pyGo').innerHTML=playV?`<span>עצור · <b class="pygb" id="pyGoB">${PY.g?PY.g.bpm:o.bpm}</b></span>`:(PY.view==='prog'?'<svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg><span>התחל הדרגה</span>':'<svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg><span>נגן</span>');
+  $('pyGo').classList.toggle('stopb',playV);
+  // שכבות: איפה הן יושבות
+  const home=playV?$('pyLanePlay'):$('pyLaneHome'); if($('pyLanes').parentNode!==home) home.appendChild($('pyLanes'));
+  if(!playV){ const key=n+':'+o.P+':'+o.C+':'+o.cnt; if(PY.lanesN!==key) pyLanesBuild(n); pyLaneState(); $('pyHd').style.opacity=0; PY.marks&&Object.values(PY.marks).flat().forEach(m=>m.classList.remove('hit')); }
+  else { $('pyPulses').innerHTML=[...Array(o.P)].map((_,i)=>`<div>${i+1}</div>`).join(''); $('pyPulses').style.gridTemplateColumns=`repeat(${o.P},1fr)`;
+    $('pyClicks').innerHTML=[...Array(o.C)].map((_,i)=>`<div>${i+1}</div>`).join(''); $('pyClicks').style.gridTemplateColumns=`repeat(${o.C},1fr)`;
+    PY.shown=-1; }
+}
+function pyShowBar(b){ const o=pyS(), st=b.st; PY.curSt=st; PY.shown=b.i;
+  const key=st.n+':'+o.P+':'+o.C+':'+o.cnt; if(PY.lanesN!==key) pyLanesBuild(st.n);
+  pyLaneState(st.prog?st.L:null);
+  $('pyPName').textContent=PY_SUBS.find(x=>x[0]===st.n)[1];
+  const parts=[`${pyN(st.n,o.P)} על ${o.C}`];
+  if(st.prog&&st.stg>=0) parts.push(`שלב ${st.stg+1}/4 · ${PY_STG[st.stg].t}`);
+  if(!st.prog) parts.push('לוחצים על שם שכבה כדי לכבות');
+  $('pyPSub').textContent=parts.join(' · ');
+  $('pyPB').textContent=pyFmt(st.bpm*o.P/o.C); $('pyCB').textContent=st.bpm; if($('pyGoB')) $('pyGoB').textContent=st.bpm;
+  $('pyNext').hidden=!st.prog; $('pyPrg').hidden=!st.prog;
+  if(st.prog){ $('pyNext').innerHTML=`<span>הבא: <b>${st.next}</b></span><span class="pyl2">${st.left<=1?'בתיבה הבאה':'עוד '+st.left+' תיבות'}</span>`;
+    $('pyPrg').innerHTML=[...Array(st.segs)].map((_,i)=>`<i class="${i<st.seg?'d1':i===st.seg?'d2':''}"></i>`).join(''); }
+}
+function pyFrame(){ if(!PY.on) return; PY.raf=requestAnimationFrame(pyFrame);
+  if(!PY.play||!ctx||!PY.bars.length) return;
+  const now=ctx.currentTime-(ctx.outputLatency||0)-(ctx.baseLatency||0);
+  let b=null; for(const x of PY.bars) if(x.t0<=now) b=x; if(!b) return;
+  if(b.i!==PY.shown) pyShowBar(b);
+  const fr=Math.min(0.9999,(now-b.t0)/b.dur), el=$('pyLanes'), tr=el.querySelector('.pytr'), hd=$('pyHd');
+  if(tr&&hd){ hd.style.opacity=1; hd.style.left=(tr.offsetLeft+tr.offsetWidth*(0.03+0.94*fr))+'px'; }
+  const cnt={c:b.C,p:b.P,s:b.N};
+  for(const k of ['c','p','s']){ const n=cnt[k], x=fr*n, i=Math.floor(x), since=(x-i)*b.dur/n, M=PY.marks&&PY.marks[k]; if(!M) continue;
+    M.forEach((m,j)=>m.classList.toggle('hit',j===i&&since<0.11)); }
+  const pi=Math.floor(fr*b.P), ci=Math.floor(fr*b.C);
+  [...$('pyPulses').children].forEach((d,j)=>d.classList.toggle('on',j===pi));
+  [...$('pyClicks').children].forEach((d,j)=>d.classList.toggle('on',j===ci));
+}
+function pyKey(e){ if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return; if($('kpWrap').classList.contains('open')) return;
+  if(e.code==='Space'){ e.preventDefault(); pyToggle(); }
+  else if(e.key==='Escape'){ e.preventDefault(); if(!$('pySheet').hidden) $('pySheet').hidden=true; else $('pyX').click(); }
+  else if(e.key==='ArrowUp'||e.key==='ArrowRight'){ e.preventDefault(); pySetBpm(pyS().bpm+(e.shiftKey?5:1)); }
+  else if(e.key==='ArrowDown'||e.key==='ArrowLeft'){ e.preventDefault(); pySetBpm(pyS().bpm-(e.shiftKey?5:1)); }
+}
+if($("pyOpen")){ $("pyOpen").onclick=pyOpen; try{ const o=pyS(); $("pyOpen").querySelector("i").textContent=o.P+":"+o.C; }catch(e){} }
