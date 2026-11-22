@@ -178,6 +178,11 @@ async function checkUpdate() {
 if (LOCAL) { setTimeout(checkUpdate, 5000); setInterval(checkUpdate, 3 * 60 * 60 * 1000); }
 
 server.listen(PORT, () => {
+  // the stop script uses this to find the process
+  const PIDF = path.join(path.dirname(DATA), 'server.pid');
+  try { fs.mkdirSync(path.dirname(PIDF), { recursive: true }); fs.writeFileSync(PIDF, String(process.pid)); } catch (e) {}
+  const bye = () => { try { if (fs.readFileSync(PIDF, 'utf8').trim() === String(process.pid)) fs.unlinkSync(PIDF); } catch (e) {} };
+  process.on('exit', bye); process.on('SIGINT', () => process.exit(0)); process.on('SIGTERM', () => process.exit(0));
   console.log(`\n  ChartReady is running:  http://localhost:${PORT}`);
   if (LOCAL) lanIPs().forEach(ip => console.log(`  From your phone (same WiFi):  http://${ip}:${PORT}`));
   console.log('\n  Keep this running. Close it = ChartReady stops.\n');
