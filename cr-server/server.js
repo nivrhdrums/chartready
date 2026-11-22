@@ -135,7 +135,7 @@ wss.on('connection', (ws, req) => {
 setInterval(() => { wss.clients.forEach(ws => { if (!ws.alive) return ws.terminate(); ws.alive = false; try { ws.ping(); } catch (e) {} }); for (const [c, v] of codes) if (Date.now() > v.expires) codes.delete(c); }, 25000);
 
 /* ---------- auto-update (personal version) ---------- */
-// Every few hours the computer checks the site for a newer build of the app (public/) and swaps the files in place.
+// Every 30 minutes the computer checks the site for a newer build of the app (public/) and swaps the files in place.
 // Only public/ is updated; server.js, data/ and the start scripts are never touched. NO_UPDATE=1 turns this off.
 const https = require('https');
 const UPDATE_URL = process.env.UPDATE_URL || 'https://nivrhdrums.github.io/chartready/c40b604d/local/';
@@ -175,7 +175,7 @@ async function checkUpdate() {
   } catch (e) { if (e.message !== lastErr) ulog('check failed: ' + e.message); lastErr = e.message; }
   finally { updating = false; }
 }
-if (LOCAL) { setTimeout(checkUpdate, 5000); setInterval(checkUpdate, 3 * 60 * 60 * 1000); }
+if (LOCAL) { setTimeout(checkUpdate, 5000); setInterval(checkUpdate, 30 * 60 * 1000); }
 
 server.listen(PORT, () => {
   // the stop script uses this to find the process

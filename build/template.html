@@ -3330,7 +3330,7 @@ function stop(){
   if(S.tab==='tr') trIdle();
   try{ wake&&wake.release(); }catch(e){} wake=null;
   if(tapOnNow()) tapSummary();
-  if(S.clkClick&&clk.on) clockStop();
+  // the practice clock keeps running when the metronome stops (stopping the clock still stops the click)
   if(FILM.run) filmStopped();
 }
 function toggle(){ if(RC.remoteMode){ rsend({k:'cmd',c:'toggle'}); return; } playing?stop():start(); }
