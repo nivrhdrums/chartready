@@ -1,5 +1,5 @@
 {
- "v": "2.0.31",
+ "v": "2.0.32",
  "files": [
   {
    "name": "icon-180.png",
@@ -18,8 +18,8 @@
   },
   {
    "name": "index.html",
-   "size": 463282,
-   "sha256": "cb3a18a7f7338ce954d8b655499e446fc0a0f508e1490dba3b45def3e111e9cc"
+   "size": 463350,
+   "sha256": "9ab135df16e2d149b4dfe70fcc17259d37fdaed6932d7843602c49a2c67f91cb"
   },
   {
    "name": "manifest.webmanifest",
@@ -29,7 +29,7 @@
   {
    "name": "sw.js",
    "size": 1757,
-   "sha256": "5607e88f5ee1aa019d2a27511134f7b73b05ed32f8eb9bbacb7f01aad9466bd8"
+   "sha256": "0c256b1e1d002858ebb30a9a1925fb864a80e87b0cbc74b98979f75efb860fcd"
   }
  ]
 }
