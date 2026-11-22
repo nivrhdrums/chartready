@@ -18,6 +18,13 @@ h=open(S+'index.html').read()
 h=h.replace('<head>','<head><meta name="robots" content="noindex,nofollow">',1).replace('href="icon-180.png"','href="icon-star-180.png"').replace('<title>ChartReady</title>','<title>ChartReady ⭐</title>')
 w=open(S+'sw.js').read().replace("'chartready-","'chartready-star-"); open(S+'sw.js','w').write(w)
 open(S+'index.html','w').write(h)
+# local auto-update feed: the exact public/ of the personal package + version.json (server.js checks it every 3 hours)
+import hashlib
+LP=OUT+'ChartReady-אישי/public/'; LD=S+'local/'; os.makedirs(LD,exist_ok=True); files=[]
+for f in sorted(os.listdir(LP)):
+    if not os.path.isfile(LP+f): continue
+    shutil.copy(LP+f,LD+f); b=open(LP+f,'rb').read(); files.append({'name':f,'size':len(b),'sha256':hashlib.sha256(b).hexdigest()})
+json.dump({'v':'2.0.'+open(B+'ver.txt').read().strip(),'files':files},open(LD+'version.json','w'),indent=1)
 msg=sys.argv[1] if len(sys.argv)>1 else 'Update'
 g=lambda *a: subprocess.run(['git','-C',R]+list(a),check=True)
 g('add','-A')

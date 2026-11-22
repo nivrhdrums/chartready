@@ -134,6 +134,49 @@ wss.on('connection', (ws, req) => {
 });
 setInterval(() => { wss.clients.forEach(ws => { if (!ws.alive) return ws.terminate(); ws.alive = false; try { ws.ping(); } catch (e) {} }); for (const [c, v] of codes) if (Date.now() > v.expires) codes.delete(c); }, 25000);
 
+/* ---------- auto-update (personal version) ---------- */
+// Every few hours the computer checks the site for a newer build of the app (public/) and swaps the files in place.
+// Only public/ is updated; server.js, data/ and the start scripts are never touched. NO_UPDATE=1 turns this off.
+const https = require('https');
+const UPDATE_URL = process.env.UPDATE_URL || 'https://nivrhdrums.github.io/chartready/c40b604d/local/';
+const ULOG = path.join(path.dirname(DATA), 'update.log');
+function ulog(s) { console.log('[update] ' + s); try { fs.mkdirSync(path.dirname(ULOG), { recursive: true }); fs.appendFileSync(ULOG, new Date().toISOString() + ' ' + s + '\n'); } catch (e) {} }
+function fetchBuf(url, hops = 0) {
+  return new Promise((ok, no) => {
+    const r = https.get(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), { headers: { 'cache-control': 'no-cache', 'user-agent': 'ChartReady-local' }, timeout: 30000 }, res => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && hops < 5) { res.resume(); return fetchBuf(new URL(res.headers.location, url).href, hops + 1).then(ok, no); }
+      if (res.statusCode !== 200) { res.resume(); return no(new Error('HTTP ' + res.statusCode)); }
+      const b = []; res.on('data', c => b.push(c)); res.on('end', () => ok(Buffer.concat(b))); res.on('error', no);
+    });
+    r.on('timeout', () => r.destroy(new Error('timeout'))); r.on('error', no);
+  });
+}
+const localVer = () => { try { return (fs.readFileSync(path.join(PUBLIC, 'sw.js'), 'utf8').match(/chartready-(\d+\.\d+\.\d+)/) || [])[1] || '0.0.0'; } catch (e) { return '0.0.0'; } };
+const isNewer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+let updating = false, lastErr = '';
+async function checkUpdate() {
+  if (updating || process.env.NO_UPDATE === '1') return; updating = true;
+  try {
+    const man = JSON.parse((await fetchBuf(UPDATE_URL + 'version.json')).toString('utf8'));
+    const cur = localVer();
+    if (!man.v || !Array.isArray(man.files) || !isNewer(String(man.v), cur)) { lastErr = ''; return; }
+    const got = [];
+    for (const f of man.files) {
+      if (!/^[\w.-]+$/.test(f.name || '')) throw new Error('bad file name');
+      const buf = await fetchBuf(UPDATE_URL + f.name);
+      if (f.size && buf.length !== f.size) throw new Error('size mismatch ' + f.name);
+      if (f.sha256 && crypto.createHash('sha256').update(buf).digest('hex') !== f.sha256) throw new Error('hash mismatch ' + f.name);
+      got.push([f.name, buf]);
+    }
+    // sw.js carries the version mark, so it goes last: a half-finished update is simply retried next time
+    got.sort((a, b) => (a[0] === 'sw.js') - (b[0] === 'sw.js'));
+    for (const [name, buf] of got) { const dst = path.join(PUBLIC, name), tmp = dst + '.new'; fs.writeFileSync(tmp, buf); fs.renameSync(tmp, dst); }
+    lastErr = ''; ulog(`updated ${cur} -> ${man.v}`);
+  } catch (e) { if (e.message !== lastErr) ulog('check failed: ' + e.message); lastErr = e.message; }
+  finally { updating = false; }
+}
+if (LOCAL) { setTimeout(checkUpdate, 5000); setInterval(checkUpdate, 3 * 60 * 60 * 1000); }
+
 server.listen(PORT, () => {
   console.log(`\n  ChartReady is running:  http://localhost:${PORT}`);
   if (LOCAL) lanIPs().forEach(ip => console.log(`  From your phone (same WiFi):  http://${ip}:${PORT}`));
