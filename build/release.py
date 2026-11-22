@@ -39,7 +39,7 @@ node server.js
 ''')
 W=B+'win/'
 shutil.copy(B+'win/chartready.ico',P+'chartready.ico')
-for src,dst in [('ChartReady.vbs','ChartReady.vbs'),('stop.vbs','כיבוי ChartReady.vbs'),('autostart.vbs','הפעלה אוטומטית עם המחשב.vbs')]:
+for src,dst in [('ChartReady.vbs','ChartReady.vbs'),('stop.vbs','כיבוי ChartReady.vbs'),('autostart.vbs','הפעלה אוטומטית עם המחשב.vbs'),('restart.vbs','הפעלה מחדש ChartReady.vbs')]:
     open(P+dst,'w',encoding='utf-16',newline='\r\n').write(open(W+src).read())
 open(P+'קרא אותי.txt','w').write('''ChartReady · הגרסה האישית (רצה על המחשב שלך)
 
